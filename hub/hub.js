@@ -840,6 +840,7 @@ function messageNode(message, grouped, reactions) {
           replied ? [el("strong", { text: nameOf(replied.user_id) }), el("span", { text: preview(replied) })] : el("span", { text: "Earlier message" }))
         : null,
       grouped ? null : el("div", { class: "msg-meta" }, el("strong", { text: name }), el("time", { datetime: message.created_at, text: timeLabel(message.created_at) })),
+      forMe ? el("span", { class: "mention-label", text: "Mentioned you" }) : null,
       message.kind === "sticker" ? stickerNode(message.body) : message.body ? bodyNode(message.body, mentions) : null,
       file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploading…" }) : null,
       reactions?.length ? reactionsRow(message, reactions) : null),

@@ -883,3 +883,24 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
   display:grid;place-items:center;padding:0;line-height:1;text-align:center;
 }
 
+/* Make messages addressed to the signed-in member easy to spot at a glance. */
+.message.mentions-me{
+  border:1px solid #c0782875;
+  border-left:4px solid #e0ad6c;
+  border-radius:12px;
+  background:linear-gradient(105deg,#c0782828,#c078280d 72%,transparent);
+  box-shadow:0 0 0 2px #c0782811,inset 0 0 20px #c078280c;
+}
+.message.mentions-me:hover{
+  border-color:#e0ad6c;
+  background:linear-gradient(105deg,#c0782834,#c0782812 72%,transparent);
+}
+.mention-label{
+  display:inline-flex;align-items:center;align-self:flex-start;
+  margin:0 3px 6px;padding:3px 8px;
+  border:1px solid #c0782860;border-radius:999px;
+  background:#302116;color:#e9bd83;
+  font-size:10px;font-weight:700;line-height:1.2;
+}
+.message.own .mention-label{align-self:flex-end}
+

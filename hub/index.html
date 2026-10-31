@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="hub.css?v=20261031-28">
   <link rel="stylesheet" href="premium.css?v=20261031-23">
-  <script type="module" src="hub.js?v=20261031-28"></script>
+  <script type="module" src="hub.js?v=20261031-29"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -116,7 +116,7 @@
         <span class="channel-code" id="channel-code"></span>
         <div class="tabs" role="tablist">
           <button class="tab is-active" type="button" role="tab" data-tab="chat" aria-selected="true"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5.5h14v10H11l-4.5 3v-3H5z"/><path d="M8.5 9.5h7M8.5 12.5h4"/></svg><span class="tab-label">Conversations</span></button>
-          <button class="tab" type="button" role="tab" data-tab="files" aria-selected="false"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 6.5h6l2 2h7v9h-15z"/><path d="M4.5 9h15"/></svg><span class="tab-label">Class library</span><span class="count" id="file-count"></span></button>
+          <button class="tab" type="button" role="tab" data-tab="files" aria-selected="false"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 6.5h6l2 2h7v9h-15z"/><path d="M4.5 9h15"/></svg><span class="tab-label">Class library</span></button>
           <button class="tab" type="button" role="tab" data-tab="ai" aria-selected="false"><svg class="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="m18.5 15 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg><span class="tab-label">AI</span></button>
         </div>
         <button class="icon-btn bell" id="notifications-btn" type="button" title="Notifications" aria-label="Notifications" hidden><svg class="header-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg><span class="unread" id="unread-count" hidden></span></button>

@@ -800,7 +800,6 @@ function renderHeader() {
   $("channel-sem").textContent = channel?.semester_id ? state.semesters.find((semester) => semester.id === channel.semester_id)?.name || "" : "";
   $("channel-code").textContent = channel?.course_code || "";
   $("message-input").placeholder = "Message";
-  $("file-count").textContent = state.files.length ? String(state.files.length) : "";
   $("members-toggle").hidden = !state.workspace;
   document.querySelectorAll(".tab").forEach((tab) => {
     const active = tab.dataset.tab === state.tab;

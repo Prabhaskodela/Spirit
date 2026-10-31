@@ -23,8 +23,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="hub.css?v=20261031-27">
-  <link rel="stylesheet" href="premium.css?v=20261031-11">
-  <script type="module" src="hub.js?v=20261031-16"></script>
+  <link rel="stylesheet" href="premium.css?v=20261031-12">
+  <script type="module" src="hub.js?v=20261031-17"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -112,7 +112,7 @@
 
     <main class="main">
       <header class="channel-header">
-        <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-label="Show workspaces and channels">☰</button>
+        <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-label="Show workspaces and channels" aria-controls="nav" aria-expanded="false">☰<span>Browse</span></button>
         <h2 class="channel-title"><span class="hash" id="channel-hash">•</span><span id="channel-name"></span></h2>
         <span class="channel-sem" id="channel-sem"></span>
         <span class="channel-code" id="channel-code"></span>

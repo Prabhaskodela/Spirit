@@ -2578,6 +2578,7 @@ async function summarize(file) {
 
 function closePanels() {
   $("app").classList.remove("nav-open", "members-open");
+  $("menu-toggle").setAttribute("aria-expanded", "false");
   $("members-toggle").setAttribute("aria-expanded", "false");
 }
 
@@ -2666,7 +2667,10 @@ $("sign-out").addEventListener("click", async () => {
   if (forget.checked) await backup.forget().catch(() => {});
   await supabase.auth.signOut();
 });
-$("menu-toggle").addEventListener("click", () => $("app").classList.toggle("nav-open"));
+$("menu-toggle").addEventListener("click", () => {
+  const open = $("app").classList.toggle("nav-open");
+  $("menu-toggle").setAttribute("aria-expanded", String(open));
+});
 $("members-toggle").addEventListener("click", () => {
   const open = $("app").classList.toggle("members-open");
   $("members-toggle").setAttribute("aria-expanded", String(open));

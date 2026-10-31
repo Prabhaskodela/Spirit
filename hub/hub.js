@@ -103,7 +103,7 @@ const hue = (id) => parseInt(id.replace(/-/g, "").slice(0, 6), 16) % 360;
 const nameOf = (userId) => state.members.get(userId)?.display_name || "Former member";
 const formatSize = (size) => (size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`);
 const shortTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const channelName = (raw) => raw.toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+const channelName = (raw) => raw.trim().replace(/\s+/gu, " ").slice(0, 40);
 const inviteLink = (code) => `${location.origin}${location.pathname}#join=${code}`;
 const field = (label, input) => el("label", { class: "field" }, el("span", { text: label }), input);
 const isBirthday = (person) => {

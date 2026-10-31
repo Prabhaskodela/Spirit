@@ -1,7 +1,7 @@
 {
-  "name": "Spirit",
-  "short_name": "Spirit",
-  "description": "Shared class rooms for subjects, files, chats, and memories.",
+  "name": "SpiritHUB",
+  "short_name": "SpiritHUB",
+  "description": "SpiritHUB shared class rooms for subjects, files, chats, and memories.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

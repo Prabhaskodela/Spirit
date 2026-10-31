@@ -477,7 +477,7 @@ async function openChannel(id) {
   $("memories-view").hidden = true;
   $("admin-view").hidden = true;
   refreshStorage();
-  setTab(state.tab);
+  setTab("chat");
   renderSidebar();
   $("messages").replaceChildren(el("p", { class: "loading", text: "Loading messages…" }));
   $("files-view").replaceChildren(el("p", { class: "loading", text: "Loading files…" }));
@@ -512,10 +512,10 @@ async function openChannel(id) {
   subscribe(id);
   renderMessages(true);
   renderFiles();
-  if (state.tab === "ai") renderAiView();
   renderHeader();
   const unreadMessageId = state.unreadMarker;
   if (unreadMessageId && $("messages").querySelector(`[data-id="${unreadMessageId}"]`)) jumpTo(unreadMessageId);
+  $("message-input").focus({ preventScroll: true });
   markChannelRead(id);
 }
 

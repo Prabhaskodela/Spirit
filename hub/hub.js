@@ -60,6 +60,8 @@ const state = {
   reactions: [],
   memories: [],
   unread: 0,
+  channelUnread: new Map(),
+  unreadMarker: null,
   notifications: null,
   workspaceRealtime: null,
   aiPicked: new Set(), // files the Ask AI chat reads in full
@@ -359,7 +361,7 @@ function unsubscribe() {
 function resetWorkspace() {
   unsubscribe();
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
-  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], workspaceRealtime: null, aiPicked: new Set() });
+  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
   $("storage").hidden = true;
   $("backup-status").hidden = true;
   $("chat-view").classList.remove("has-background");
@@ -402,6 +404,26 @@ async function loadMembers(workspaceId = state.workspace?.id) {
   finally { if (memberLoad?.promise === promise) memberLoad = null; }
 }
 
+async function loadChannelUnread(workspaceId) {
+  const unreadByChannel = new Map();
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase.from("hub_notifications").select("channel_id, event_key, created_at")
+      .eq("user_id", state.user.id).eq("workspace_id", workspaceId).is("read_at", null)
+      .not("channel_id", "is", null).order("created_at", { ascending: true }).range(offset, offset + 999);
+    // Notifications were added by update 002; keep the hub usable if that optional table isn't installed.
+    if (error) return new Map();
+    for (const row of data) {
+      const current = unreadByChannel.get(row.channel_id) || { count: 0, createdAt: row.created_at, messageId: row.event_key?.split(":")[1] || null };
+      current.count += 1;
+      unreadByChannel.set(row.channel_id, current);
+    }
+    if (data.length < 1000) break;
+    offset += data.length;
+  }
+  return unreadByChannel;
+}
+
 async function openWorkspace(id) {
   const workspace = state.workspaces.find((candidate) => candidate.id === id);
   if (!workspace) return;
@@ -413,16 +435,18 @@ async function openWorkspace(id) {
   $("ws-name").textContent = workspace.name;
   $("channel-tree").replaceChildren(el("p", { class: "loading", text: "Loading…" }));
   try {
-    const [semesters, channels] = await Promise.all([
+    const [semesters, channels, , channelUnread] = await Promise.all([
       supabase.from("hub_semesters").select("*").eq("workspace_id", id).order("position").order("created_at"),
       supabase.from("hub_channels").select("*").eq("workspace_id", id).order("position").order("created_at"),
       loadMembers(),
+      loadChannelUnread(id),
     ]);
     if (semesters.error) throw semesters.error;
     if (channels.error) throw channels.error;
     if (state.workspace?.id !== id) return;
     state.semesters = semesters.data;
     state.channels = channels.data;
+    state.channelUnread = channelUnread;
   } catch (error) {
     toast(error.message);
     return;
@@ -444,6 +468,8 @@ async function openChannel(id) {
   const channel = state.channels.find((candidate) => candidate.id === id);
   if (!channel) return;
   unsubscribe();
+  const unreadAtOpen = state.channelUnread.get(id);
+  state.unreadMarker = unreadAtOpen?.messageId || null;
   Object.assign(state, { channel, messages: [], files: [], reactions: [], view: "channel", aiPicked: new Set() });
   clearReply();
   closePanels();
@@ -468,6 +494,17 @@ async function openChannel(id) {
     return;
   }
   state.messages = messages.data.reverse();
+  if (state.unreadMarker && !state.messages.some((message) => message.id === state.unreadMarker)) {
+    const marker = await supabase.from("hub_messages").select("created_at").eq("id", state.unreadMarker).maybeSingle();
+    if (state.channel?.id !== id) return;
+    if (!marker.error && marker.data) {
+      const fromUnread = await supabase.from("hub_messages").select("*").eq("channel_id", id)
+        .gte("created_at", marker.data.created_at).order("created_at", { ascending: true }).limit(PAGE_SIZE);
+      if (state.channel?.id !== id) return;
+      if (!fromUnread.error && fromUnread.data.some((message) => message.id === state.unreadMarker)) state.messages = fromUnread.data;
+    }
+  }
+  if (state.unreadMarker && !state.messages.some((message) => message.id === state.unreadMarker)) state.unreadMarker = null;
   state.files = files.data;
   const ids = state.messages.map((message) => message.id);
   // Reactions arrive with update 002; without it the channel still works, just without them.
@@ -479,6 +516,8 @@ async function openChannel(id) {
   renderFiles();
   if (state.tab === "ai") renderAiView();
   renderHeader();
+  const unreadMessageId = state.unreadMarker;
+  if (unreadMessageId && $("messages").querySelector(`[data-id="${unreadMessageId}"]`)) jumpTo(unreadMessageId);
   markChannelRead(id);
 }
 
@@ -595,12 +634,22 @@ function renderSidebar() {
   const count = state.members.size;
   $("ws-name").textContent = workspace?.name || "SpiritHUB";
   $("ws-sub").textContent = workspace ? [workspace.academic_year, `${count} member${count === 1 ? "" : "s"}`].filter(Boolean).join(" · ") : "";
-  const channelRow = (channel) => el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}` },
-    el("button", { class: "channel-link", type: "button", onclick: () => openChannel(channel.id) },
-      el("span", { class: "hash", text: "•" }),
-      el("span", { class: "channel-label", text: channelDisplayName(channel.name) }),
-      channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
-    admin ? rowActions([[`Edit ${channelDisplayName(channel.name)}`, "✎", () => editChannel(channel)], [`Delete ${channelDisplayName(channel.name)}`, "✕", () => deleteChannel(channel)]]) : null);
+  const channelRow = (channel) => {
+    const unread = state.channelUnread.get(channel.id)?.count || 0;
+    const channelName = channelDisplayName(channel.name);
+    return el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}` },
+      el("button", {
+        class: "channel-link", type: "button", title: `${channelName}${unread ? ` · ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
+        "aria-label": `${channelName}${unread ? `, ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
+        onclick: () => openChannel(channel.id),
+      },
+        el("span", { class: "hash", text: "•" }),
+        el("span", { class: "channel-copy" },
+          el("span", { class: "channel-label", text: channelName }),
+          channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
+        unread ? el("span", { class: "channel-unread", text: unread > 99 ? "99+" : String(unread), "aria-hidden": "true" }) : null),
+      admin ? rowActions([[`Edit ${channelName}`, "✎", () => editChannel(channel)], [`Delete ${channelName}`, "✕", () => deleteChannel(channel)]]) : null);
+  };
   const tree = [];
   if (workspace) {
     tree.push(el("button", { class: `memories-link${state.view === "memories" ? " is-active" : ""}`, type: "button", onclick: openMemories },
@@ -823,6 +872,7 @@ function renderMessages(toBottom = false) {
   for (const message of visibleMessages) {
     // A reply always shows its author, so its quote reads naturally.
     const grouped = !message.reply_to_id && previous?.user_id === message.user_id && new Date(message.created_at) - new Date(previous.created_at) < 5 * 60 * 1000;
+    if (message.id === state.unreadMarker) nodes.push(el("div", { class: "unread-divider", role: "separator" }, el("span", { text: "Unread messages" })));
     nodes.push(messageNode(message, grouped, reactionsByMessage.get(message.id)));
     previous = message;
   }
@@ -2026,9 +2076,24 @@ function subscribeNotifications() {
     .channel(`hub-notifications-${state.user.id}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_notifications", filter: `user_id=eq.${state.user.id}` }, ({ new: row }) => onNotification(row))
     // Reading them in another tab or on another device lowers the badge here too.
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_notifications", filter: `user_id=eq.${state.user.id}` }, () => refreshUnread())
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_notifications", filter: `user_id=eq.${state.user.id}` }, ({ new: row }) => {
+      refreshUnread();
+      scheduleChannelUnreadRefresh(row.workspace_id);
+    })
     .subscribe();
   refreshUnread();
+}
+
+let channelUnreadRefreshTimer = null;
+function scheduleChannelUnreadRefresh(workspaceId) {
+  if (!workspaceId || workspaceId !== state.workspace?.id) return;
+  clearTimeout(channelUnreadRefreshTimer);
+  channelUnreadRefreshTimer = setTimeout(async () => {
+    const unreadByChannel = await loadChannelUnread(workspaceId);
+    if (state.workspace?.id !== workspaceId) return;
+    state.channelUnread = unreadByChannel;
+    renderSidebar();
+  }, 180);
 }
 
 // Coming back to SpiritHUB counts as reading the channel that's open.
@@ -2053,8 +2118,10 @@ async function onNotification(row) {
   // Someone reading the channel the message is in doesn't need to be told about it.
   if (row.channel_id && row.channel_id === state.channel?.id && document.hasFocus()) {
     await supabase.from("hub_notifications").update({ read_at: new Date().toISOString() }).eq("id", row.id);
+    scheduleChannelUnreadRefresh(row.workspace_id);
     return;
   }
+  if (row.channel_id) scheduleChannelUnreadRefresh(row.workspace_id);
   refreshUnread();
   if ("Notification" in window && Notification.permission === "granted" && !document.hasFocus()) {
     new Notification(row.title, { body: row.body, tag: row.event_key });
@@ -2063,7 +2130,10 @@ async function onNotification(row) {
 
 async function markChannelRead(channelId) {
   const { error } = await supabase.from("hub_notifications").update({ read_at: new Date().toISOString() }).eq("user_id", state.user.id).eq("channel_id", channelId).is("read_at", null);
-  if (!error) refreshUnread();
+  if (!error) {
+    refreshUnread();
+    scheduleChannelUnreadRefresh(state.workspace?.id);
+  }
 }
 
 function browserNotificationControl() {

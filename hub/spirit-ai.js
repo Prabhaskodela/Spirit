@@ -6,7 +6,7 @@ const SPIRIT_AI_FILE_TYPES = new Set(["application/pdf", "image/png", "image/jpe
 export function spiritAiMimeType(file) {
   const declared = String(file?.type || "").toLowerCase().split(";")[0].trim();
   if (SPIRIT_AI_FILE_TYPES.has(declared)) return declared;
-  if (declared) return "";
+  if (declared && declared !== "application/octet-stream") return "";
   const extension = String(file?.name || "").toLowerCase().split(".").pop();
   return ({
     pdf: "application/pdf",
@@ -97,12 +97,13 @@ export async function askSpiritAi(client, { workspaceId, prompt, history = [], f
       onProgress?.({ stage: "preparing", percent: Math.round(percent * 100) }));
     attachment = { name: file.name, mime, data: encoded };
   }
-  onProgress?.({ stage: "uploading", percent: 0 });
+  const reportProgress = file ? onProgress : undefined;
+  reportProgress?.({ stage: "uploading", percent: 0 });
   return postWithProgress(
     SUPABASE_URL + "/functions/v1/spirit-ai",
     data.session.access_token,
     { workspaceId, prompt, history, attachment },
     signal,
-    (progress) => onProgress?.(progress),
+    (progress) => reportProgress?.(progress),
   );
 }

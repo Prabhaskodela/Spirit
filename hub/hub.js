@@ -345,8 +345,6 @@ function showApp() {
   $("auth").hidden = true;
   $("app").hidden = false;
   $("me-name").textContent = state.profile.display_name;
-  $("me-email").textContent = state.user?.email || "";
-  $("me-email").title = state.user?.email || "";
   renderMyAvatar();
   renderRail();
 }
@@ -1777,6 +1775,7 @@ async function editProfile() {
   // The year is a placeholder (2000 has a 29 February); only the month and day are saved, like the original app.
   const birthday = el("input", { class: "input", type: "date", value: profile.birth_month ? `2000-${pad(profile.birth_month)}-${pad(profile.birth_day)}` : "" });
   const body = el("div", { class: "dialog-fields" },
+    el("div", { class: "profile-account" }, el("span", { text: "Signed in with" }), el("strong", { text: state.user?.email || "Email unavailable" })),
     photo.node,
     field("Display name (what your classmates see)", name),
     field("Birthday (optional, only the day and month are kept)", birthday));

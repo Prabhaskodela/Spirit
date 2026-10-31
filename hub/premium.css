@@ -697,12 +697,6 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
   .composer .send{width:36px;min-width:36px;flex-basis:36px}
 }
 
-/* Show the account address in the profile footer without letting long addresses crop the layout. */
-.me-copy .me-email{
-  display:block;min-width:0;max-width:100%;margin-top:1px;overflow:hidden;
-  color:#b5aaa4;font-size:10px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap;
-}
-
 /* Preview shared media in a contained, responsive in-app dialog. */
 .file-viewer{
   position:fixed;inset:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));
@@ -756,6 +750,9 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 }
 .unread-divider::before,.unread-divider::after{content:"";height:1px;flex:1;background:#c078286b}
 .unread-divider span{flex:0 0 auto;padding:4px 9px;border:1px solid #c078283d;border-radius:999px;background:#2c2019}
+.profile-account{display:grid;gap:5px;padding:10px 12px;border:1px solid #68554b55;border-radius:10px;background:#201a18}
+.profile-account>span{color:#b5aaa4;font-size:11px;font-weight:600}
+.profile-account>strong{color:#f0e8e8;font-size:13px;line-height:1.4;overflow-wrap:anywhere;user-select:text}
 
 /* Keep menus, pickers and dialogs inside short or edge-to-edge viewports. */
 .ws-menu{

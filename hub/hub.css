@@ -327,7 +327,7 @@ a{color:var(--mint)}
 .channel-intro h3{font-size:25px;letter-spacing:-.03em}
 .message{padding-top:4px;padding-bottom:4px}
 .message:not(.grouped){margin-top:20px}
-.message:hover{background:#ffffff035}
+.message:hover{background:#ffffff05}
 .msg-meta strong{color:#eff2e9}
 .msg-meta time{font-variant-numeric:tabular-nums}
 .msg-body{color:#dce4dc;line-height:1.65}

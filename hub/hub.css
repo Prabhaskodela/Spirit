@@ -583,3 +583,14 @@ a,.link{color:var(--mint)}code{background:#ffffff0d}
   .message.own>.msg-main{width:min(84%,560px)}
   .message:not(.own) .msg-main{width:100%}
 }
+
+
+/* Message controls and reaction details */
+.msg-actions{max-width:min(94vw,520px);flex-wrap:wrap;align-items:center}
+.msg-actions button.text{padding:0 8px;border-radius:7px}
+.msg-actions button.text:hover{background:#ffffff12}
+.msg-actions button.danger-text{color:#efa198}
+.msg-actions button.danger-text:hover{background:#e88e8318;color:#ffc0b6}
+.reaction-details{display:grid;gap:8px;min-width:min(260px,72vw);max-height:50dvh;overflow:auto}
+.reaction-person{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:9px;color:var(--text)}
+.reaction-person:hover{background:#ffffff08}

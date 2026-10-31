@@ -549,3 +549,7 @@ a,.link{color:var(--mint)}code{background:#ffffff0d}
   .channel .row-actions{opacity:1}
   .channel .row-actions button[title^="Delete"]{width:26px;padding:0 5px;opacity:.65;pointer-events:auto}
 }
+
+
+/* SpiritHUB star mark replaces the generic channel dot */
+.channel-title .hash{color:#d3dda2;font-size:15px;text-shadow:0 0 12px #b9d28b40}

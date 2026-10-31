@@ -297,16 +297,9 @@ function renderRoomList() {
     const button = document.createElement("button");
     button.className = `room-item${state.room?.id === room.id ? " is-active" : ""}`;
     button.type = "button";
-    const isUnsemesteredChitChat = room.name.trim().toLocaleLowerCase() === "chit chat" && !String(room.academic_year || "").trim();
-    const mark = document.createElement(isUnsemesteredChitChat ? "img" : "span");
-    mark.className = isUnsemesteredChitChat ? "room-monogram room-group-logo" : "room-monogram";
-    if (isUnsemesteredChitChat) {
-      mark.src = "/Spirit/icons/icon-192.png";
-      mark.alt = "";
-      mark.setAttribute("aria-hidden", "true");
-    } else {
-      mark.textContent = room.name.trim().charAt(0).toUpperCase();
-    }
+    const mark = document.createElement("span");
+    mark.className = "room-monogram";
+    mark.textContent = room.name.trim().charAt(0).toUpperCase();
     const copy = document.createElement("span");
     copy.className = "room-item-copy";
     const title = document.createElement("strong");
@@ -640,7 +633,7 @@ async function loadSubjects() {
 function renderSubjects() {
   const list = $("#subject-list");
   list.replaceChildren();
-  for (const [index, subject] of state.subjects.entries()) {
+  for (const subject of state.subjects) {
     const wrapper = document.createElement("div");
     wrapper.className = "subject-row-wrapper";
     const button = document.createElement("button");
@@ -648,8 +641,7 @@ function renderSubjects() {
     button.className = `subject-row${state.subject?.id === subject.id ? " is-active" : ""}`;
     const icon = document.createElement("span");
     icon.className = "subject-icon";
-    icon.textContent = String(index + 1);
-    icon.setAttribute("aria-label", `Subject ${index + 1}`);
+    icon.textContent = "✳";
     const copy = document.createElement("span");
     const name = document.createElement("strong");
     name.textContent = subject.name;

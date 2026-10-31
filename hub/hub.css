@@ -1303,4 +1303,4 @@ a,.link{color:#a7ddcb}
 .msg-menu-dots{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
 .msg-menu-dots>span{display:block;width:3px;height:3px;border-radius:50%;background:currentColor}
 
-.msg-actions.is-floating{position:fixed;z-index:10000;max-width:min(94vw,520px);box-sizing:border-box;opacity:1;pointer-events:auto;visibility:visible}
+.msg-actions.is-floating{position:fixed;z-index:10000;max-width:min(94vw,520px);max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow:auto;box-sizing:border-box;opacity:1;pointer-events:auto;visibility:visible}

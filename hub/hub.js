@@ -786,8 +786,16 @@ function renderHeader() {
   const special = state.workspace && { memories: ["📷", "Memories"], admin: ["🛠", "Admin panel"] }[state.view];
   document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
-  $("channel-hash").textContent = special ? special[0] : "";
-  $("channel-hash").hidden = !special;
+  const channelMark = $("channel-hash");
+  channelMark.classList.toggle("team-logo", Boolean(channel && !special));
+  if (special) channelMark.textContent = special[0];
+  else if (channel) {
+    const teamIcon = $("members-toggle").querySelector("svg").cloneNode(true);
+    teamIcon.querySelector("circle")?.remove();
+    channelMark.replaceChildren(teamIcon);
+  }
+  else channelMark.replaceChildren();
+  channelMark.hidden = !channel && !special;
   $("channel-name").textContent = special ? special[1] : channelDisplayName(channel?.name || "");
   $("channel-sem").textContent = channel?.semester_id ? state.semesters.find((semester) => semester.id === channel.semester_id)?.name || "" : "";
   $("channel-code").textContent = channel?.course_code || "";

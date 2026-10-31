@@ -904,3 +904,11 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 }
 .message.own .mention-label{align-self:flex-end}
 
+/* Use a clean, round team mark beside group chat titles. */
+.channel-title .hash.team-logo{
+  width:36px;height:36px;flex:0 0 36px;border-radius:50%;
+  border-color:#c0782840;background:linear-gradient(145deg,#30251f,#211a18);
+  color:#e0ad6c;text-shadow:none;
+}
+.channel-title .hash.team-logo .header-icon{width:21px;height:21px;overflow:visible}
+

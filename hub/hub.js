@@ -104,7 +104,15 @@ const nameOf = (userId) => state.members.get(userId)?.display_name || "Former me
 const formatSize = (size) => (size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`);
 const shortTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const channelDisplayName = (raw) => String(raw || "").replace(/[-_]+/gu, " ").replace(/\s+/gu, " ").trim();
-const channelName = (raw) => raw.trim().replace(/\s+/gu, " ").slice(0, 40);
+const hiddenMessagesKey = () => `hiddenMessages:${state.user?.id || ""}:${state.workspace?.id || ""}`;
+function hideMessageForMe(message) {
+  const ids = local.get(hiddenMessagesKey()) || [];
+  if (!ids.includes(message.id)) local.set(hiddenMessagesKey(), [...ids, message.id].slice(-3000));
+  renderMessages();
+  toast("Message hidden for you");
+}
+
+const channelName = (raw) => raw.trim().replace(/\\s+/gu, " ").slice(0, 40);
 const inviteLink = (code) => `${location.origin}${location.pathname}#join=${code}`;
 const field = (label, input) => el("label", { class: "field" }, el("span", { text: label }), input);
 const isBirthday = (person) => {
@@ -707,8 +715,18 @@ function reactionsRow(message, reactions) {
     type: "button",
     title: names.join(", "),
     "aria-label": `${emoji} ${names.length}${mine ? ", including you" : ""}`,
-    onclick: () => toggleReaction(message, emoji),
+    onclick: () => showReactionDetails(message, emoji),
   }, emoji, el("span", { text: String(names.length) }))));
+}
+
+function showReactionDetails(message, emoji) {
+  const names = state.reactions
+    .filter((reaction) => reaction.message_id === message.id && reaction.emoji === emoji)
+    .map((reaction) => nameOf(reaction.user_id));
+  const body = names.length
+    ? el("div", { class: "reaction-details" }, ...names.map((name) => el("div", { class: "reaction-person" }, el("span", { class: "avatar small", text: initials(name) }), el("span", { text: name }))))
+    : el("p", { class: "muted", text: "No reactions yet." });
+  ask({ title: `${emoji} Reactions`, body, okLabel: "Done", cancelLabel: null });
 }
 
 function messageNode(message, grouped, reactions) {
@@ -734,7 +752,14 @@ function messageNode(message, grouped, reactions) {
     el("div", { class: "msg-actions" },
       el("button", { class: "text", type: "button", title: "Reply", onclick: () => setReply(message) }, "Reply"),
       ...QUICK_REACTIONS.map((emoji) => el("button", { type: "button", title: `React with ${emoji}`, "aria-label": `React with ${emoji}`, onclick: () => toggleReaction(message, emoji) }, emoji)),
-      canDelete ? el("button", { type: "button", title: "Delete message", "aria-label": "Delete message", onclick: () => deleteMessage(message, file) }, "✕") : null));
+      message.user_id === state.user.id
+        ? [
+            el("button", { class: "text", type: "button", title: "Delete for me", onclick: () => hideMessageForMe(message) }, "Delete for me"),
+            el("button", { class: "text danger-text", type: "button", title: "Unsend for everyone", onclick: () => deleteMessage(message, file, true) }, "Unsend")
+          ]
+        : state.role === "admin"
+          ? el("button", { class: "text danger-text", type: "button", title: "Delete for everyone", onclick: () => deleteMessage(message, file, true) }, "Delete")
+          : null));
   // Touch screens have no hover, so a tap shows the message's actions.
   node.addEventListener("click", (event) => {
     if (!event.target.closest("button, a, img, details, input")) node.classList.toggle("is-selected");
@@ -747,8 +772,10 @@ function renderMessages(toBottom = false) {
   if (!state.channel) return;
   const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 120;
   const previousTop = list.scrollTop;
+  const hiddenIds = new Set(local.get(hiddenMessagesKey()) || []);
+  const visibleMessages = state.messages.filter((message) => !hiddenIds.has(message.id));
   const nodes = [];
-  if (state.messages.length < PAGE_SIZE) {
+  if (visibleMessages.length < PAGE_SIZE) {
     nodes.push(el("div", { class: "channel-intro" },
       el("div", { class: "intro-hash", text: "💬", "aria-hidden": "true" }),
       el("h3", { text: `Welcome to ${channelDisplayName(state.channel.name)}${state.channel.course_code ? ` · ${state.channel.course_code}` : ""}` }),
@@ -760,7 +787,7 @@ function renderMessages(toBottom = false) {
     reactionsByMessage.get(reaction.message_id).push(reaction);
   }
   let previous = null;
-  for (const message of state.messages) {
+  for (const message of visibleMessages) {
     // A reply always shows its author, so its quote reads naturally.
     const grouped = !message.reply_to_id && previous?.user_id === message.user_id && new Date(message.created_at) - new Date(previous.created_at) < 5 * 60 * 1000;
     nodes.push(messageNode(message, grouped, reactionsByMessage.get(message.id)));
@@ -1211,9 +1238,12 @@ async function openFile(file) {
   }
 }
 
-async function deleteMessage(message, file) {
-  const body = file ? `The file "${file.name}" is deleted too.` : "This can't be undone.";
-  if (!(await ask({ title: "Delete this message?", body, okLabel: "Delete", danger: true }))) return;
+async function deleteMessage(message, file, unsend = false) {
+  const body = file
+    ? `The file "${file.name}" and its message will be removed for everyone.`
+    : "This message will be removed for everyone and can't be restored.";
+  const title = unsend ? "Unsend this message for everyone?" : "Delete this message for everyone?";
+  if (!(await ask({ title, body, okLabel: unsend ? "Unsend" : "Delete", danger: true }))) return;
   if (file) {
     // Deleting the file row also deletes the message that carries it.
     const result = await supabase.from("hub_files").delete().eq("id", file.id).select("id");

@@ -638,6 +638,13 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 /* Keep the conversation wide and make the roster an intentional, on-demand view. */
 .app{grid-template-columns:minmax(240px,280px) minmax(0,1fr);min-width:0}
 .nav,.sidebar,.main,.channel-header,.channel-title,.tabs,.chat,.messages{min-width:0}
+/* The legacy header fixed a shorter height than its two grid rows, which pushed
+   the title above the viewport on wide screens. Size it to both rows. */
+.channel-header{
+  height:auto;min-height:0;flex:0 0 auto;
+  grid-template-rows:minmax(42px,auto) 46px;align-content:center;
+  padding:8px 18px 0;overflow:visible;
+}
 .members{
   position:fixed;inset:0 0 0 auto;z-index:40;width:min(340px,88vw);height:100dvh;min-height:0;
   transform:translateX(102%);overflow-y:auto;box-shadow:none;
@@ -660,7 +667,7 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 }
 @media(max-width:760px){
   .app{grid-template-columns:minmax(0,1fr)}
-  .channel-header{grid-template-columns:34px minmax(0,1fr) auto auto;grid-template-rows:40px 42px;gap:4px 6px;padding:6px 10px 0;min-height:0;height:auto}
+  .channel-header{grid-template-columns:34px minmax(0,1fr) auto auto;grid-template-rows:40px 42px;gap:4px 6px;padding:6px 10px 0;min-height:0;height:auto;align-content:start}
   .menu-toggle{grid-area:1/1;display:grid}
   .channel-title{grid-area:1/2;font-size:clamp(14px,4vw,16px)}
   #notifications-btn{grid-area:1/3}

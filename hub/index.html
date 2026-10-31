@@ -23,8 +23,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="hub.css?v=20261031-27">
-  <link rel="stylesheet" href="premium.css?v=20261031-19">
-  <script type="module" src="hub.js?v=20261031-22"></script>
+  <link rel="stylesheet" href="premium.css?v=20261031-20">
+  <script type="module" src="hub.js?v=20261031-23"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -102,7 +102,7 @@
           <button class="backup-status" id="backup-status" type="button" title="About the backup on this device" hidden></button>
         </div>
         <footer class="me">
-          <span class="avatar" id="me-avatar">S</span>
+          <span class="presence-avatar-wrap"><span class="avatar" id="me-avatar">S</span><span class="presence-dot" id="me-online" title="Online" role="img" aria-label="Online" hidden></span></span>
           <button class="me-copy" id="profile-btn" type="button" title="Profile and account settings"><strong id="me-name"></strong></button>
         </footer>
       </aside>

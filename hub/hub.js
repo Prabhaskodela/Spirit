@@ -43,6 +43,7 @@ const state = {
   semesters: [],
   channels: [],
   members: new Map(),
+  onlineMembers: new Set(),
   channel: null,
   messages: [],
   files: [],
@@ -359,7 +360,8 @@ function unsubscribe() {
 function resetWorkspace() {
   unsubscribe();
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
-  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
+  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), onlineMembers: new Set(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
+  $("me-online").hidden = true;
   $("storage").hidden = true;
   $("backup-status").hidden = true;
   $("chat-view").classList.remove("has-background");
@@ -532,11 +534,23 @@ function scheduleStorageRefresh() {
 function subscribeWorkspace(workspaceId) {
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
   const filter = `workspace_id=eq.${workspaceId}`;
-  state.workspaceRealtime = supabase
-    .channel(`hub-workspace-${workspaceId}`)
+  const channel = supabase
+    .channel(`hub-workspace-${workspaceId}`, { config: { presence: { key: state.user.id } } })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_files", filter }, scheduleStorageRefresh)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_files", filter }, ({ new: row }) => row.archived_at && scheduleStorageRefresh())
-    .subscribe();
+    .on("presence", { event: "sync" }, () => {
+      if (state.workspace?.id !== workspaceId) return;
+      const presence = channel.presenceState();
+      state.onlineMembers = new Set(Object.values(presence).flatMap((entries) => entries.map((entry) => entry.user_id).filter(Boolean)));
+      $("me-online").hidden = !state.onlineMembers.has(state.user.id);
+      renderMembers();
+    });
+  state.workspaceRealtime = channel;
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED" && state.workspace?.id === workspaceId) {
+      channel.track({ user_id: state.user.id }).catch(() => {});
+    }
+  });
 }
 
 function subscribe(channelId) {
@@ -897,7 +911,9 @@ function renderMembers() {
   const ownerId = state.workspace.created_by;
   const people = [...state.members.values()].sort((a, b) => a.display_name.localeCompare(b.display_name));
   const row = (member) => el("div", { class: "member" },
-    avatarNode(member, "small"),
+    el("span", { class: "member-avatar-wrap" },
+      avatarNode(member, "small"),
+      state.onlineMembers.has(member.user_id) ? el("span", { class: "presence-dot", title: "Online", role: "img", "aria-label": "Online" }) : null),
     el("span", { class: "member-name", text: `${member.display_name}${member.user_id === state.user.id ? " (you)" : ""}` }),
     isBirthday(member) ? el("span", { class: "birthday", title: "Birthday today", "aria-label": "Birthday today", text: "🎂" }) : null,
     member.user_id === ownerId ? el("span", { class: "badge", text: "owner" }) : null,
@@ -1590,6 +1606,7 @@ function renderMyAvatar() {
   const node = avatarNode({ user_id: state.user.id, display_name: state.profile.display_name, avatar_path: state.profile.avatar_path });
   node.id = "me-avatar";
   $("me-avatar").replaceWith(node);
+  $("me-online").hidden = !state.onlineMembers.has(state.user.id);
 }
 
 // A workspace's photo in the left bar, or its initials when it has none.

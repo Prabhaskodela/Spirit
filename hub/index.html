@@ -13,16 +13,17 @@
       screen.classList.add("is-done");
       window.setTimeout(() => screen.remove(), 500);
     };
-    window.addEventListener("load", () => window.setTimeout(window.finishSpiritBoot, 650), { once: true });
-    window.setTimeout(window.finishSpiritBoot, 5000);
+    window.addEventListener("load", () => window.setTimeout(window.finishSpiritBoot, 1100), { once: true });
+    window.setTimeout(window.finishSpiritBoot, 6000);
   </script>
   <link rel="manifest" href="./manifest.json">
   <link rel="apple-touch-icon" href="../icons/icon-192.png">
+  <link rel="preload" as="image" href="../spirit-boot.jpg">
   <link rel="icon" href="../icons/icon-192.png" type="image/png" sizes="192x192">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="hub.css?v=20261031-5">
+  <link rel="stylesheet" href="hub.css?v=20261031-6">
   <script type="module" src="hub.js?v=20261031-5"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
@@ -39,12 +40,7 @@
 </head>
 <body>
   <div class="spirit-boot" id="spirit-boot" role="status" aria-label="Loading SpiritHUB Workspaces">
-    <div class="boot-content">
-      <div class="boot-glow" aria-hidden="true"></div>
-      <img class="boot-wordmark" src="../spirit-wordmark.png" alt="SpiritHUB Workspaces">
-      <div class="boot-spinner" aria-hidden="true"></div>
-      <p class="boot-caption">YOUR SPACE IS GETTING READY</p>
-    </div>
+    <img class="boot-image" src="../spirit-boot.jpg" alt="" fetchpriority="high">
   </div>
   <section class="center-screen" id="setup" hidden>
     <div class="card">

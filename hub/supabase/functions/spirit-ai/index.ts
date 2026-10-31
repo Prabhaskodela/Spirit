@@ -79,24 +79,26 @@ Deno.serve(async (req) => {
   } catch {
     return response(req, { error: "Spirit AI received an invalid request." }, 400);
   }
-  const channelId = typeof body.channelId === "string" ? body.channelId : "";
+  const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : "";
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-  if (!/^[0-9a-f-]{36}$/i.test(channelId)) return response(req, { error: "Choose a room before asking Spirit AI." }, 400);
+  if (!/^[0-9a-f-]{36}$/i.test(workspaceId)) return response(req, { error: "Choose a workspace before asking Spirit AI." }, 400);
   if (!prompt || prompt.length > 4000) return response(req, { error: "Write a question of up to 4,000 characters." }, 400);
 
-  const channelUrl = new URL(supabaseUrl + "/rest/v1/hub_channels");
-  channelUrl.searchParams.set("id", "eq." + channelId);
-  channelUrl.searchParams.set("select", "id,name,course_code");
-  let channelResponse;
+  const membershipUrl = new URL(supabaseUrl + "/rest/v1/hub_members");
+  membershipUrl.searchParams.set("workspace_id", "eq." + workspaceId);
+  membershipUrl.searchParams.set("user_id", "eq." + user.id);
+  membershipUrl.searchParams.set("select", "workspace_id");
+  let membershipResponse;
   try {
-    channelResponse = await fetch(channelUrl, { headers: authHeaders });
+    membershipResponse = await fetch(membershipUrl, { headers: authHeaders });
   } catch {
-    return response(req, { error: "Couldn't check your access to this room. Try again." }, 503);
+    return response(req, { error: "Couldn't check your access to this workspace. Try again." }, 503);
   }
-  if (!channelResponse.ok) return response(req, { error: "Couldn't verify your access to this room." }, 403);
-  const channels = await channelResponse.json().catch(() => []);
-  const channel = Array.isArray(channels) ? channels[0] : null;
-  if (!channel) return response(req, { error: "You don't have access to this room." }, 403);
+  if (!membershipResponse.ok) return response(req, { error: "Couldn't verify your access to this workspace." }, 403);
+  const memberships = await membershipResponse.json().catch(() => []);
+  if (!Array.isArray(memberships) || memberships.length === 0) {
+    return response(req, { error: "You don't have access to this workspace." }, 403);
+  }
 
   const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
   const contents = history
@@ -112,9 +114,7 @@ Deno.serve(async (req) => {
     if (fileBytes < 1 || fileBytes > maxFileBytes) return response(req, { error: "Spirit AI accepts files up to 4 MB for now." }, 413);
     parts.push({ inline_data: { mime_type: attachment.mime, data: attachment.data } });
   }
-  parts.push({ text: "Room: " + String(channel.name || "classroom").slice(0, 80)
-    + (channel.course_code ? " (" + String(channel.course_code).slice(0, 20) + ")" : "")
-    + "\n\nStudent's request:\n" + prompt });
+  parts.push({ text: "Workspace study request:\n\nStudent's request:\n" + prompt });
 
   contents.push({ role: "user", parts });
   let aiResponse;

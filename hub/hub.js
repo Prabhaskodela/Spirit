@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 34750)
-Total output lines: 2729
-
 // SpiritHUB workspaces: Discord-style class spaces (workspace → semesters → subject channels) on Supabase.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
@@ -1205,7 +1202,392 @@ async function uploadFiles(files) {
     upsertFile(row.data);
     backup.saveBlob(workspace.id, path, file).catch(() => {}); // your own uploads go into this device's backup straight away
     state.storageUsed += file.size;
-    …4750 tokens truncated…om", zoom, zoomValue),
+    renderStorage();
+    const message = await supabase.from("hub_messages").insert({ workspace_id: workspace.id, channel_id: channel.id, file_id: row.data.id }).select().single();
+    if (message.error) toast(message.error.message);
+    else {
+      addMessage(message.data);
+      toast(`Uploaded ${file.name}`);
+    }
+  }
+}
+
+async function signedUrl(path) {
+  const cached = state.signedUrls.get(path);
+  if (cached && cached.expires > Date.now()) return cached.url;
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+  if (error) throw error;
+  state.signedUrls.set(path, { url: data.signedUrl, expires: Date.now() + 3500 * 1000 });
+  return data.signedUrl;
+}
+
+// Update 004 adds archived_at to hub_files; until it's run, queries can't mention it.
+let archiveCheck = null;
+function hasArchiveColumn() {
+  archiveCheck ||= supabase.from("hub_files").select("archived_at").limit(1).then(({ error }) => {
+    if (error && error.code !== "42703" && !/archived_at/.test(error.message)) archiveCheck = null; // a network hiccup: check again next time
+    return !error;
+  });
+  return archiveCheck;
+}
+
+const localUrls = new Map(); // storage path → address of the copy in this device's backup
+
+// Files show from this device's backup when it has them: nothing to download, and archived files still open.
+async function fileUrl(item) {
+  if (localUrls.has(item.path)) return localUrls.get(item.path);
+  const blob = await backup.fileBlob(item.path).catch(() => null);
+  if (blob) {
+    localUrls.set(item.path, URL.createObjectURL(blob));
+    return localUrls.get(item.path);
+  }
+  return item.archived_at ? null : signedUrl(item.path);
+}
+
+async function fileData(item) {
+  const blob = await backup.fileBlob(item.path).catch(() => null);
+  if (blob) return blob;
+  if (item.archived_at) throw new Error("This file was archived and isn't saved on this device.");
+  const { data, error } = await supabase.storage.from(BUCKET).download(item.path);
+  if (error) throw error;
+  return data;
+}
+
+async function openFile(file) {
+  const tab = window.open("about:blank", "_blank"); // opened during the click so popup blockers allow it
+  try {
+    const url = await fileUrl(file);
+    if (!url) throw new Error("This file was archived to free up space, and it isn't saved on this device.");
+    if (tab) {
+      tab.opener = null;
+      tab.location.href = url;
+    } else location.assign(url);
+  } catch (error) {
+    tab?.close();
+    toast(error.message);
+  }
+}
+
+async function deleteMessage(message, file, unsend = false) {
+  const body = file
+    ? `The file "${file.name}" and its message will be removed for everyone.`
+    : "This message will be removed for everyone and can't be restored.";
+  const title = unsend ? "Unsend this message for everyone?" : "Delete this message for everyone?";
+  if (!(await ask({ title, body, okLabel: unsend ? "Unsend" : "Delete", danger: true }))) return;
+  if (file) {
+    // Deleting the file row also deletes the message that carries it.
+    const result = await supabase.from("hub_files").delete().eq("id", file.id).select("id");
+    if (failed(result, "Only the uploader or an admin can delete this file.")) return;
+    await supabase.storage.from(BUCKET).remove([file.path]);
+    forgetLocally("files", file);
+    state.files = state.files.filter((candidate) => candidate.id !== file.id);
+    refreshStorage();
+  } else {
+    const result = await supabase.from("hub_messages").delete().eq("id", message.id).select("id");
+    if (failed(result, "Only the sender or an admin can delete this message.")) return;
+  }
+  forgetLocally("messages", message);
+  state.messages = state.messages.filter((candidate) => candidate.id !== message.id);
+  renderMessages();
+  renderFiles();
+  renderHeader();
+}
+
+/* ---------- Storage meter (as in the original app) ---------- */
+
+// Supabase returns at most 1,000 rows per request, so page through bigger tables.
+async function fetchAll(build) {
+  const rows = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < 1000) return rows;
+  }
+}
+
+const sizeOf = (rows) => rows.reduce((total, row) => total + Number(row.size || 0), 0);
+const countOf = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+// Warns from 80% so admins can free up space before uploads start failing.
+function renderStorage() {
+  const percent = Math.min(100, (state.storageUsed / STORAGE_LIMIT) * 100);
+  $("storage").hidden = !state.workspace;
+  $("storage").classList.toggle("is-near", percent >= 80 && percent < 95);
+  $("storage").classList.toggle("is-full", percent >= 95);
+  const warning = percent >= 100 ? " · full" : percent >= 80 ? " · almost full" : "";
+  $("storage-label").textContent = `Workspace files · ${state.storageUsed ? formatSize(state.storageUsed) : "0 MB"} / 100 MB${warning}`;
+  $("storage-fill").style.width = `${percent}%`;
+  $("storage-meter").setAttribute("aria-valuenow", String(Math.round(percent)));
+  $("free-space").hidden = !(percent >= 80 && state.role === "admin");
+}
+
+async function refreshStorage() {
+  const workspaceId = state.workspace?.id;
+  if (!workspaceId) return;
+  try {
+    const archiving = await hasArchiveColumn();
+    const [live, memories] = await Promise.all([
+      // Archived files no longer take up space.
+      fetchAll(() => {
+        const query = supabase.from("hub_files").select("size").eq("workspace_id", workspaceId);
+        return archiving ? query.is("archived_at", null) : query;
+      }),
+      fetchAll(() => supabase.from("hub_memories").select("size").eq("workspace_id", workspaceId)).catch(() => []), // memories arrive with update 002
+    ]);
+    if (state.workspace?.id !== workspaceId) return;
+    state.storageUsed = sizeOf(live) + sizeOf(memories);
+    renderStorage();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+/* ---------- Backup on this device ---------- */
+
+const backupRuns = new Map(); // workspace id → the backup running for it
+let persistAsked = false;
+
+// Every device keeps its own copy of the workspaces it opens (see backup.js). Resolves to whether it worked.
+function backupNow(workspaceId = state.workspace?.id) {
+  if (!workspaceId || !state.user) return Promise.resolve(false);
+  if (!backupRuns.has(workspaceId)) {
+    backupRuns.set(workspaceId, syncBackup(workspaceId)
+      .then(() => true)
+      .catch((error) => {
+        setBackupStatus(workspaceId, `Backup paused: ${error.message}`, true);
+        return false;
+      })
+      .finally(() => backupRuns.delete(workspaceId)));
+  }
+  return backupRuns.get(workspaceId);
+}
+
+async function syncBackup(workspaceId) {
+  const record = (await backup.syncRecord(workspaceId)) || { workspace_id: workspaceId };
+  // Messages: only the new ones each time. Deleted ones leave the backup within a day.
+  const fresh = await fetchAll(() => {
+    const query = supabase.from("hub_messages").select("*").eq("workspace_id", workspaceId).order("created_at");
+    return record.last_message_at ? query.gte("created_at", record.last_message_at) : query;
+  });
+  await backup.saveRows("messages", fresh);
+  if (fresh.length) record.last_message_at = fresh[fresh.length - 1].created_at;
+  if (!record.swept_at || Date.now() - Date.parse(record.swept_at) > 86400000) {
+    const ids = new Set((await fetchAll(() => supabase.from("hub_messages").select("id").eq("workspace_id", workspaceId))).map((row) => row.id));
+    await backup.removeRows("messages", (await backup.keysOf("messages", workspaceId)).filter((id) => !ids.has(id)));
+    record.swept_at = new Date().toISOString();
+  }
+  const columns = (await hasArchiveColumn()) ? "id, summarized_by, archived_at" : "id, summarized_by";
+  const files = await mirror("files", workspaceId, () => fetchAll(() => supabase.from("hub_files").select(columns).eq("workspace_id", workspaceId)),
+    (saved, row) => saved.summarized_by !== row.summarized_by || (saved.archived_at ?? null) !== (row.archived_at ?? null));
+  const photos = await mirror("memories", workspaceId, () => fetchAll(() => supabase.from("hub_memories").select("id").eq("workspace_id", workspaceId)), () => false);
+  // The files and photos themselves, each downloaded once per device.
+  const saved = new Set(await backup.keysOf("blobs", workspaceId));
+  const missing = [...files.filter((file) => !file.archived_at), ...photos].filter((item) => !saved.has(item.path));
+  if (missing.length && !navigator.connection?.saveData) {
+    if (!(await roomFor(sizeOf(missing)))) throw new Error("this device is low on space");
+    for (const [index, item] of missing.entries()) {
+      setBackupStatus(workspaceId, `Backing up on this device · ${index + 1} of ${missing.length}`);
+      await saveOnDevice(workspaceId, item);
+    }
+  }
+  Object.assign(record, {
+    synced_at: new Date().toISOString(),
+    bytes: sizeOf(await backup.rowsOf("blobs", workspaceId)),
+    messages: (await backup.keysOf("messages", workspaceId)).length,
+    files: files.length,
+    photos: photos.length,
+  });
+  await backup.saveSyncRecord(record);
+  showBackupStatus(workspaceId, record);
+  if (!persistAsked) {
+    persistAsked = true;
+    navigator.storage?.persist?.().catch(() => {}); // asks the browser not to clear the backup when space runs low
+  }
+}
+
+// Keeps one backup table in step with Supabase: deleted rows go, and new or changed rows are fetched in full.
+async function mirror(store, workspaceId, list, changed) {
+  let listed;
+  try {
+    listed = await list();
+  } catch {
+    return backup.rowsOf(store, workspaceId);
+  }
+  const saved = new Map((await backup.rowsOf(store, workspaceId)).map((row) => [row.id, row]));
+  const ids = new Set(listed.map((row) => row.id));
+  const gone = [...saved.values()].filter((row) => !ids.has(row.id));
+  await backup.removeRows(store, gone.map((row) => row.id));
+  await backup.removeRows("blobs", gone.map((row) => row.path)); // deleted for everyone, so not kept here either
+  const wanted = listed.filter((row) => !saved.has(row.id) || changed(saved.get(row.id), row)).map((row) => row.id);
+  for (let start = 0; start < wanted.length; start += 100) {
+    const { data, error } = await supabase.from(store === "files" ? "hub_files" : "hub_memories").select("*").in("id", wanted.slice(start, start + 100));
+    if (error) throw error;
+    await backup.saveRows(store, data);
+  }
+  return backup.rowsOf(store, workspaceId);
+}
+
+// Something deleted for everyone leaves this device's backup too.
+function forgetLocally(store, row) {
+  backup.removeRows(store, [row.id]).catch(() => {});
+  if (row.path) backup.removeRows("blobs", [row.path]).catch(() => {});
+}
+
+// Saves a file or photo in this device's backup unless it's already there.
+async function saveOnDevice(workspaceId, item) {
+  if (await backup.fileBlob(item.path)) return true;
+  const { data, error } = await supabase.storage.from(BUCKET).download(item.path);
+  if (error) return false;
+  await backup.saveBlob(workspaceId, item.path, new Blob([data], { type: item.mime }));
+  return true;
+}
+
+async function roomFor(bytes) {
+  const estimate = await navigator.storage?.estimate?.().catch(() => null);
+  return !estimate?.quota || estimate.quota - estimate.usage > bytes + 50 * 1024 * 1024;
+}
+
+function setBackupStatus(workspaceId, text, problem = false) {
+  if (workspaceId !== state.workspace?.id) return;
+  const status = $("backup-status");
+  status.hidden = false;
+  status.textContent = text;
+  status.classList.toggle("is-problem", problem);
+}
+
+async function showBackupStatus(workspaceId, record) {
+  record ||= await backup.syncRecord(workspaceId).catch(() => null);
+  if (!record?.synced_at) return setBackupStatus(workspaceId, "Backing up on this device…");
+  const when = new Date(record.synced_at).toDateString() === new Date().toDateString()
+    ? shortTime(record.synced_at)
+    : new Date(record.synced_at).toLocaleDateString([], { day: "numeric", month: "short" });
+  setBackupStatus(workspaceId, `✓ Backed up on this device · ${when}`);
+}
+
+async function openBackup() {
+  const workspace = state.workspace;
+  if (!workspace) return;
+  toast("Checking the backup…");
+  await Promise.race([backupNow(workspace.id), new Promise((resolve) => setTimeout(resolve, 5000))]);
+  const record = await backup.syncRecord(workspace.id).catch(() => null);
+  const persisted = await navigator.storage?.persisted?.().catch(() => false);
+  const body = el("div", { class: "backup-info" },
+    el("p", { text: `SpiritHUB keeps a copy of ${workspace.name} in this browser and updates it every few minutes while it's open: messages, files and Memories photos. Files an admin moves off the online storage still open from here.` }),
+    el("p", { class: "muted", text: record?.synced_at
+      ? `${countOf(record.messages, "message")}, ${countOf(record.files, "file")} and ${countOf(record.photos, "photo")} (${record.bytes ? formatSize(record.bytes) : "0 MB"}) · updated ${timeLabel(record.synced_at)}`
+      : "The first backup is still running." }),
+    el("p", { class: "muted small", text: persisted
+      ? "This browser keeps it even when the device runs low on space."
+      : "Browsers may clear it when a device runs low on space, and Safari clears it after a week without opening SpiritHUB. Adding SpiritHUB to your home screen keeps it safer." }));
+  await ask({ title: "Backup on this device", body, okLabel: "Close", cancelLabel: null });
+}
+
+/* ---------- Photos: workspace photos, chat backgrounds and profile photos ---------- */
+
+const photoUrls = new Map(); // storage path → address of a photo that has loaded
+const photoLoads = new Map(); // storage path → the load in progress
+
+// Each photo downloads once per device; after that it comes from this device's backup.
+function loadPhoto(path) {
+  if (!photoLoads.has(path)) {
+    photoLoads.set(path, (async () => {
+      let blob = await backup.fileBlob(path).catch(() => null);
+      if (!blob) {
+        const { data, error } = await supabase.storage.from(BUCKET).download(path);
+        if (error) throw error;
+        blob = data;
+        backup.saveBlob("photos", path, blob).catch(() => {});
+      }
+      photoUrls.set(path, URL.createObjectURL(blob));
+      return photoUrls.get(path);
+    })().catch((error) => {
+      photoLoads.delete(path); // try again next time
+      throw error;
+    }));
+  }
+  return photoLoads.get(path);
+}
+
+const personOf = (userId) => state.members.get(userId) || { user_id: userId, display_name: nameOf(userId) };
+
+// A round profile photo, or initials on a colour when there's none (or until it loads).
+function avatarNode(person, size = "") {
+  const node = el("span", { class: `avatar${size ? ` ${size}` : ""}`, style: `--hue:${hue(person.user_id)}`, "aria-hidden": "true" });
+  const path = person.avatar_path;
+  if (path && photoUrls.has(path)) node.append(el("img", { src: photoUrls.get(path), alt: "" }));
+  else {
+    node.textContent = initials(person.display_name);
+    if (path) loadPhoto(path).then((url) => node.replaceChildren(el("img", { src: url, alt: "" }))).catch(() => {});
+  }
+  return node;
+}
+
+function renderMyAvatar() {
+  const node = avatarNode({ user_id: state.user.id, display_name: state.profile.display_name, avatar_path: state.profile.avatar_path });
+  node.id = "me-avatar";
+  $("me-avatar").replaceWith(node);
+}
+
+// A workspace's photo in the left bar, or its initials when it has none.
+function workspaceIcon(workspace) {
+  if (!workspace.icon_path) return initials(workspace.name);
+  const image = el("img", { class: "rail-photo", alt: "" });
+  if (photoUrls.has(workspace.icon_path)) image.src = photoUrls.get(workspace.icon_path);
+  else loadPhoto(workspace.icon_path).then((url) => { image.src = url; }).catch(() => image.replaceWith(initials(workspace.name)));
+  return image;
+}
+
+// The workspace's background shows faintly behind its chats.
+function renderBackground() {
+  const path = state.workspace?.background_path;
+  const view = $("chat-view");
+  view.classList.toggle("has-background", Boolean(path));
+  view.style.removeProperty("--chat-background");
+  if (!path) return;
+  loadPhoto(path).then((url) => {
+    if (state.workspace?.background_path === path) view.style.setProperty("--chat-background", `url("${url}")`);
+  }).catch(() => view.classList.remove("has-background"));
+}
+
+// A dialog row that shows the current photo and lets you choose another or remove it.
+function photoField(label, path, round = false) {
+  let picked = null;
+  let removed = false;
+  let previewUrl = null;
+  const crop = { zoom: 1, x: 50, y: 50 };
+  const preview = el("span", { class: `photo-preview${round ? " round" : ""}` });
+  const cropControls = el("div", { class: "photo-crop-controls", hidden: true });
+  const show = (url) => {
+    preview.replaceChildren(url ? el("img", { src: url, alt: "Profile photo crop preview" }) : el("span", { text: "No photo selected" }));
+    syncCropPreview();
+  };
+  function syncCropPreview() {
+    const image = preview.querySelector("img");
+    if (!image) return;
+    image.style.objectPosition = `${crop.x}% ${crop.y}%`;
+    image.style.transform = `scale(${crop.zoom})`;
+  }
+  if (path) loadPhoto(path).then((url) => { if (!picked && !removed) show(url); }).catch(() => {});
+  const remove = el("button", { class: "link small danger", type: "button", hidden: !path }, "Remove");
+  const input = el("input", { type: "file", accept: MEMORY_TYPES.join(","), hidden: true });
+  const zoom = el("input", { type: "range", min: "1", max: "2.5", step: "0.05", value: "1", "aria-label": "Photo zoom" });
+  const horizontal = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo left or right" });
+  const vertical = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo up or down" });
+  const zoomValue = el("span", { text: "1×" });
+  const horizontalValue = el("span", { text: "50%" });
+  const verticalValue = el("span", { text: "50%" });
+  const resetCrop = () => {
+    crop.zoom = 1; crop.x = 50; crop.y = 50;
+    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50";
+    zoomValue.textContent = "1×"; horizontalValue.textContent = "50%"; verticalValue.textContent = "50%";
+    syncCropPreview();
+  };
+  const setControl = (name, input, value) => el("label", { class: "photo-crop-control" },
+    el("span", {}, el("span", { text: name }), value), input);
+  cropControls.append(
+    el("div", { class: "photo-crop-heading" }, el("strong", { text: "Adjust your profile photo" }), el("span", { text: "Frame it before you save" })),
+    setControl("Zoom", zoom, zoomValue),
     setControl("Horizontal position", horizontal, horizontalValue),
     setControl("Vertical position", vertical, verticalValue),
     el("div", { class: "photo-crop-footer" },

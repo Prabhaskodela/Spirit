@@ -985,7 +985,7 @@ function messageNode(message, grouped, reactions) {
     class: "msg-menu-trigger",
     "aria-label": `More actions for ${nameOf(message.user_id)}'s message`,
     title: "Message actions",
-  }, "⋯");
+  }, "⋮");
   const runMessageAction = (action) => (event) => {
     actionsMenu.open = false;
     action(event);

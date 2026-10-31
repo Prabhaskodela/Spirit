@@ -44,7 +44,7 @@ For classmates on other devices, publish the repo with GitHub Pages (repo **Sett
 One command per laptop installs Ollama if needed, lets the SpiritHUB website use it (kept after restarts), and downloads the `qwen3.5:4b` model (about 3.4 GB):
 
 - **Mac**, in Terminal: `curl -fsSL https://prabhaskodela.github.io/Spirit/hub/setup/mac.sh | bash`
-- **Windows**, in PowerShell: `irm https://prabhaskodela.github.io/Spirit/hub/setup/windows.ps1 | iex`
+- **Windows**, in Command Prompt or PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object Net.WebClient).DownloadString('https://prabhaskodela.github.io/Spirit/hub/setup/windows.ps1'))"`
 
 Then in SpiritHUB click **⚙** next to your name → **Test connection** → **Save**. The ⚙ dialog shows these commands with a Copy button whenever it can't reach Ollama. Chrome may ask to let the site reach devices on your local network; allow it. The scripts are in `hub/setup/`; set `SPIRITHUB_SITE` to allow a different address.
 

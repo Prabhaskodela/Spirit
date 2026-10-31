@@ -1,9 +1,11 @@
-# SpiritHUB local AI setup for Windows. One command in PowerShell does all of it:
-#   irm https://prabhaskodela.github.io/Spirit/hub/setup/windows.ps1 | iex
+# SpiritHUB local AI setup for Windows. One command in Command Prompt or PowerShell does all of it:
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object Net.WebClient).DownloadString('https://prabhaskodela.github.io/Spirit/hub/setup/windows.ps1'))"
 # It installs Ollama if needed, lets the SpiritHUB website talk to it (kept after restarts),
 # restarts Ollama, downloads the AI model, and checks that SpiritHUB can reach it.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue" # the download progress bar makes Windows PowerShell download far slower
+# Older Windows PowerShell may leave TLS 1.2 off, and ollama.com and GitHub require it.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
 
 $Site = if ($env:SPIRITHUB_SITE) { $env:SPIRITHUB_SITE } else { "https://prabhaskodela.github.io" }
 $Model = if ($env:SPIRITHUB_MODEL) { $env:SPIRITHUB_MODEL } else { "qwen3.5:4b" }

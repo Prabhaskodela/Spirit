@@ -1859,9 +1859,14 @@ function setupCommands() {
   const script = (file) => new URL(`setup/${file}`, location.href).href;
   const local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname); // Ollama trusts these already
   const site = !local && location.origin !== SETUP_SITE ? location.origin : null;
+  // Works from Command Prompt as well as PowerShell (irm alone exists only in PowerShell), and turns on
+  // TLS 1.2, which older Windows PowerShell leaves off; this is the pattern Chocolatey's installer uses.
+  const windows = `powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object Net.WebClient).DownloadString('${script("windows.ps1")}'))"`;
   return [
     { label: "Mac: paste this into Terminal", text: `curl -fsSL ${script("mac.sh")} | ${site ? `SPIRITHUB_SITE=${site} ` : ""}bash` },
-    { label: "Windows: paste this into PowerShell", text: `${site ? `$env:SPIRITHUB_SITE="${site}"; ` : ""}irm ${script("windows.ps1")} | iex` },
+    site
+      ? { label: "Windows: paste this into PowerShell", text: `$env:SPIRITHUB_SITE="${site}"; irm ${script("windows.ps1")} | iex` }
+      : { label: "Windows: paste this into Command Prompt or PowerShell", text: windows },
   ];
 }
 

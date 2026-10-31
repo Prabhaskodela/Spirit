@@ -742,4 +742,5 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
   .ws-name{min-height:50px;padding:6px 9px}
   .ws-title>span{font-size:14px}
 }
+.members-toggle .header-icon{width:18px;height:18px;flex:0 0 18px;overflow:visible}
 

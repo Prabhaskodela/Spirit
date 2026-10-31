@@ -1,4 +1,4 @@
--- Spirit database schema for Supabase. Run this in the project's SQL Editor.
+-- SpiritHUB database schema for Supabase. Run this in the project's SQL Editor.
 create extension if not exists pgcrypto;
 
 create table public.profiles (

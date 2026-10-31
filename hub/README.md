@@ -31,8 +31,9 @@ The tables are prefixed `hub_`, so this can share a Supabase project with the ma
 - `004-free-up-space-and-mentions.sql`: Free up space, a guard that stops uploads before the project's 1 GB of file storage fills up, and @mention notifications.
 - `005-photos.sql`: workspace photos, chat backgrounds and profile photos.
 - `006-custom-invite-codes.sql`: lets admins set a stable custom invite code.
+- `007-secure-helpers-and-index-foreign-keys.sql`: restricts membership helper functions to signed-in users and adds indexes for foreign keys.
 
-New projects don't need these updates: `hub/schema.sql` includes all six.
+New projects don't need these updates: `hub/schema.sql` includes all seven.
 
 ## 2. Run it
 

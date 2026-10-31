@@ -3112,7 +3112,7 @@ async function sendSpiritAi(prompt, file) {
       prompt,
       history,
       file,
-      onProgress: ({ stage, percent = 0 }) => {
+      onProgress: file ? ({ stage, percent = 0 }) => {
         const progress = Math.floor(percent / 5) * 5;
         const status = stage === "preparing"
           ? `Preparing file… ${progress}%`
@@ -3123,7 +3123,7 @@ async function sendSpiritAi(prompt, file) {
           answer.text = status;
           if (state.workspace?.id === workspace.id && state.view === "spirit-ai") renderSpiritAiThread();
         }
-      },
+      } : undefined,
     });
   } catch (error) {
     answer.text = error.message || "Spirit AI couldn't answer right now.";

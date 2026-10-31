@@ -623,7 +623,8 @@ function renderHeader() {
   const special = state.workspace && { memories: ["📷", "Memories"], admin: ["🛠", "Admin panel"] }[state.view];
   document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
-  $("channel-hash").textContent = special ? special[0] : "✦";
+  $("channel-hash").textContent = special ? special[0] : "";
+  $("channel-hash").hidden = !special;
   $("channel-name").textContent = special ? special[1] : channelDisplayName(channel?.name || "");
   $("channel-sem").textContent = channel?.semester_id ? state.semesters.find((semester) => semester.id === channel.semester_id)?.name || "" : "";
   $("channel-code").textContent = channel?.course_code || "";

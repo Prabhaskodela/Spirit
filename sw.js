@@ -1,4 +1,4 @@
-const CACHE_NAME = "spirit-shell-v1";
+const CACHE_NAME = "spirithub-shell-v2";
 const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./app-config.js", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -6,7 +6,7 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("spirit-shell-") && key !== CACHE_NAME).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => /^(spirit|spirithub)-shell-/.test(key) && key !== CACHE_NAME).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {

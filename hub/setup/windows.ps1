@@ -11,10 +11,10 @@ $Api = "http://127.0.0.1:11434"
 
 function Step($text) { Write-Host ""; Write-Host $text -ForegroundColor Magenta }
 function Ok($text) { Write-Host "  OK  $text" -ForegroundColor Green }
-
-$drive = Get-PSDrive -Name $env:SystemDrive.TrimEnd(":")
-$freeGB = [math]::Floor($drive.Free / 1GB)
-if ($freeGB -lt 10) { throw "Only $freeGB GB of disk space is free on $($env:SystemDrive). Ollama and the AI need about 10 GB, so free up some space and run this again." }
+function Assert-FreeSpace($gb, $what) {
+  $free = [math]::Floor((Get-PSDrive -Name $env:SystemDrive.TrimEnd(":")).Free / 1GB)
+  if ($free -lt $gb) { throw "Only $free GB of disk space is free on $($env:SystemDrive), and $what needs about $gb GB. Free up some space, then run this again." }
+}
 
 Step "1 of 4 - Ollama"
 $found = Get-Command ollama -ErrorAction SilentlyContinue
@@ -22,6 +22,7 @@ $exe = if ($found) { $found.Source } else { Join-Path $env:LOCALAPPDATA "Program
 if (Test-Path $exe) {
   Ok "Already installed"
 } else {
+  Assert-FreeSpace 8 "installing Ollama"
   Write-Host "  Downloading Ollama's official installer (about 1.7 GB). This can take a while..."
   $setup = Join-Path $env:TEMP "OllamaSetup.exe"
   Invoke-WebRequest "https://ollama.com/download/OllamaSetup.exe" -OutFile $setup -UseBasicParsing
@@ -54,10 +55,18 @@ for ($i = 0; $i -lt 30 -and -not $ready; $i++) {
 if (-not $ready) { throw "Ollama didn't start. Open Ollama from the Start menu, then run this command again." }
 Ok "Ollama is running"
 
-Step "4 of 4 - Download the AI model ($Model, about 3.4 GB)"
-& $exe pull $Model
-if ($LASTEXITCODE -ne 0) { throw "The model download didn't finish. Check your internet connection, then run this command again." }
-Ok "Model ready"
+Step "4 of 4 - The AI model ($Model)"
+$haveModel = $true
+try { Invoke-RestMethod "$Api/api/show" -Method Post -ContentType "application/json" -Body (@{ model = $Model } | ConvertTo-Json) | Out-Null } catch { $haveModel = $false }
+if ($haveModel) {
+  Ok "Already downloaded"
+} else {
+  Assert-FreeSpace 4 "the AI model"
+  Write-Host "  Downloading (about 3.4 GB)..."
+  & $exe pull $Model
+  if ($LASTEXITCODE -ne 0) { throw "The model download didn't finish. Check your internet connection, then run this command again." }
+  Ok "Model ready"
+}
 
 try {
   $check = Invoke-WebRequest "$Api/api/version" -Headers @{ Origin = $Site } -UseBasicParsing

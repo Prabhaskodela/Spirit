@@ -343,6 +343,8 @@ function showApp() {
   $("auth").hidden = true;
   $("app").hidden = false;
   $("me-name").textContent = state.profile.display_name;
+  $("me-email").textContent = state.user?.email || "";
+  $("me-email").title = state.user?.email || "";
   renderMyAvatar();
   renderRail();
 }
@@ -1233,6 +1235,7 @@ function hasArchiveColumn() {
 }
 
 const localUrls = new Map(); // storage path → address of the copy in this device's backup
+let fileViewRequest = 0;
 
 // Files show from this device's backup when it has them: nothing to download, and archived files still open.
 async function fileUrl(item) {
@@ -1255,16 +1258,27 @@ async function fileData(item) {
 }
 
 async function openFile(file) {
-  const tab = window.open("about:blank", "_blank"); // opened during the click so popup blockers allow it
+  const request = ++fileViewRequest;
+  const viewer = $("file-viewer");
+  const content = $("file-viewer-content");
+  $("file-viewer-title").textContent = file.name;
+  content.replaceChildren(el("p", { class: "file-viewer-loading", text: "Opening file…", role: "status" }));
+  if (!viewer.open) viewer.showModal();
   try {
     const url = await fileUrl(file);
     if (!url) throw new Error("This file was archived to free up space, and it isn't saved on this device.");
-    if (tab) {
-      tab.opener = null;
-      tab.location.href = url;
-    } else location.assign(url);
+    if (request !== fileViewRequest || !viewer.open) return;
+    let preview;
+    if (file.mime.startsWith("image/")) {
+      preview = el("img", { class: "file-viewer-image", src: url, alt: file.name });
+    } else if (file.mime === "application/pdf") {
+      preview = el("iframe", { class: "file-viewer-pdf", src: url, title: file.name });
+    } else {
+      preview = el("p", { class: "file-viewer-loading", text: "Preview is not available for this file type." });
+    }
+    content.replaceChildren(preview);
   } catch (error) {
-    tab?.close();
+    if (request === fileViewRequest && viewer.open) content.replaceChildren(el("p", { class: "file-viewer-error", text: error.message, role: "alert" }));
     toast(error.message);
   }
 }
@@ -2621,6 +2635,14 @@ document.addEventListener("keydown", (event) => {
 $("new-workspace").addEventListener("click", createWorkspace);
 $("join-workspace").addEventListener("click", joinWithCode);
 $("profile-btn").addEventListener("click", editProfile);
+$("file-viewer-close").addEventListener("click", () => $("file-viewer").close());
+$("file-viewer").addEventListener("click", (event) => {
+  if (event.target === $("file-viewer")) $("file-viewer").close();
+});
+$("file-viewer").addEventListener("close", () => {
+  fileViewRequest += 1;
+  $("file-viewer-content").replaceChildren();
+});
 $("notifications-btn").addEventListener("click", openNotifications);
 $("backup-status").addEventListener("click", openBackup);
 setInterval(() => document.visibilityState === "visible" && backupNow(), BACKUP_EVERY);

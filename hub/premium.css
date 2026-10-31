@@ -697,3 +697,25 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
   .composer .send{width:36px;min-width:36px;flex-basis:36px}
 }
 
+/* Keep menus, pickers and dialogs inside short or edge-to-edge viewports. */
+.ws-menu{
+  max-height:min(70dvh,560px);overflow-y:auto;overscroll-behavior:contain;
+}
+.picker,.mention-picker{
+  max-height:min(45dvh,300px);overflow:auto;overscroll-behavior:contain;
+}
+.members{
+  padding-top:max(18px,env(safe-area-inset-top));
+  padding-bottom:max(18px,env(safe-area-inset-bottom));
+  overscroll-behavior:contain;
+}
+.modal{
+  width:min(520px,calc(100vw - 24px));max-width:none;
+  max-height:calc(100dvh - max(24px,env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  margin:auto;padding:clamp(16px,4vw,24px);overflow:auto;overscroll-behavior:contain;
+}
+@media(max-width:760px){
+  .ws-menu{max-height:calc(100dvh - 130px)}
+  .modal{width:calc(100vw - 24px)}
+}
+

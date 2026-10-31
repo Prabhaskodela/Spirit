@@ -627,7 +627,7 @@ function renderHeader() {
   $("channel-name").textContent = special ? special[1] : channelDisplayName(channel?.name || "");
   $("channel-sem").textContent = channel?.semester_id ? state.semesters.find((semester) => semester.id === channel.semester_id)?.name || "" : "";
   $("channel-code").textContent = channel?.course_code || "";
-  $("message-input").placeholder = channel ? `Message ${channelDisplayName(channel.name)}` : "Message";
+  $("message-input").placeholder = "Message";
   $("file-count").textContent = state.files.length ? String(state.files.length) : "";
   $("members-toggle").hidden = !state.workspace;
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -2577,6 +2577,7 @@ async function summarize(file) {
 
 function closePanels() {
   $("app").classList.remove("nav-open", "members-open");
+  $("members-toggle").setAttribute("aria-expanded", "false");
 }
 
 function toggleMenu(open = $("ws-menu").hidden) {
@@ -2665,7 +2666,10 @@ $("sign-out").addEventListener("click", async () => {
   await supabase.auth.signOut();
 });
 $("menu-toggle").addEventListener("click", () => $("app").classList.toggle("nav-open"));
-$("members-toggle").addEventListener("click", () => $("app").classList.toggle("members-open"));
+$("members-toggle").addEventListener("click", () => {
+  const open = $("app").classList.toggle("members-open");
+  $("members-toggle").setAttribute("aria-expanded", String(open));
+});
 $("scrim").addEventListener("click", closePanels);
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => state.channel && setTab(tab.dataset.tab)));
 
@@ -2722,3 +2726,4 @@ if (!configured) {
     }, 0);
   });
 }
+

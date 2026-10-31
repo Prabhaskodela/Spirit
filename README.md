@@ -1,8 +1,8 @@
 # SpiritHUB
 
-SpiritHUB is a semester-based class space for course files, room chat, and shared memories. It uses the PixelPulse dark, gradient-led visual style and is designed as a static web app backed by Supabase.
+SpiritHUB is a class collaboration project for semester subjects, course files, room chat, and shared memories. It is a static web app backed by Supabase, with a responsive layout for desktop, tablet, and phone screens.
 
-The layout adapts to desktop, tablet, and phone screens. The web manifest and service worker support installing SpiritHUB to a device home screen and caching the app shell. Sign-in, messages, uploads, and shared room data require an internet connection; the app shell alone is not an offline copy of class content.
+The web manifest and service worker support installing SpiritHUB to a device home screen and caching the app shell. Sign-in, messages, uploads, and shared room data require an internet connection; the app shell alone is not an offline copy of class content.
 
 ## Free-tier shape
 

@@ -3,7 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 import * as backup from "./backup.js";
-import { SPIRIT_AI_MAX_FILE_BYTES, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261101-spirit-ai-7";
+import { SPIRIT_AI_MAX_FILE_BYTES, spiritAiMimeType, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261101-spirit-ai-8";
 
 const BUCKET = "hub-files";
 const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -2972,6 +2972,12 @@ function openSpiritAi() {
   renderSpiritAiView();
 }
 
+function formatSpiritAiFileSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
 function renderSpiritAiView() {
   const workspace = state.workspace;
   if (!workspace || state.view !== "spirit-ai") return;
@@ -3003,7 +3009,7 @@ function renderSpiritAiView() {
     attachedFile = file;
     fileRow.hidden = !file;
     fileRow.replaceChildren(
-      file ? el("span", { text: "📎 " + file.name + " · " + (file.size / 1024 / 1024).toFixed(1) + " MB" }) : null,
+      file ? el("span", { text: "📎 " + file.name + " · " + formatSpiritAiFileSize(file.size) + " · ready to send" }) : null,
       file ? removeFile : null,
     );
   };
@@ -3014,9 +3020,13 @@ function renderSpiritAiView() {
   fileInput.addEventListener("change", () => {
     const file = fileInput.files?.[0];
     if (!file) return;
-    if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    if (!spiritAiMimeType(file)) {
       fileInput.value = "";
       return toast("Attach a PDF, PNG, JPEG, or WebP file.");
+    }
+    if (!file.size) {
+      fileInput.value = "";
+      return toast("This file is empty. Choose another file.");
     }
     if (file.size > SPIRIT_AI_MAX_FILE_BYTES) {
       fileInput.value = "";
@@ -3102,6 +3112,18 @@ async function sendSpiritAi(prompt, file) {
       prompt,
       history,
       file,
+      onProgress: ({ stage, percent = 0 }) => {
+        const progress = Math.floor(percent / 5) * 5;
+        const status = stage === "preparing"
+          ? `Preparing file… ${progress}%`
+          : stage === "uploading"
+            ? `Uploading file… ${progress}%`
+            : "File sent. Spirit AI is analyzing it…";
+        if (answer.text !== status) {
+          answer.text = status;
+          if (state.workspace?.id === workspace.id && state.view === "spirit-ai") renderSpiritAiThread();
+        }
+      },
     });
   } catch (error) {
     answer.text = error.message || "Spirit AI couldn't answer right now.";

@@ -30,8 +30,9 @@ The tables are prefixed `hub_`, so this can share a Supabase project with the ma
 - `003-fix-replies.sql`: lets replies to earlier messages send.
 - `004-free-up-space-and-mentions.sql`: Free up space, a guard that stops uploads before the project's 1 GB of file storage fills up, and @mention notifications.
 - `005-photos.sql`: workspace photos, chat backgrounds and profile photos.
+- `006-custom-invite-codes.sql`: lets admins set a stable custom invite code.
 
-New projects don't need them, because `hub/schema.sql` already includes all of them.
+New projects don't need these updates: `hub/schema.sql` includes all six.
 
 ## 2. Run it
 

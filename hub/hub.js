@@ -3,6 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 import * as backup from "./backup.js";
+import { SPIRIT_AI_MAX_FILE_BYTES, askSpiritAi as requestSpiritAi } from "./spirit-ai.js";
 
 const BUCKET = "hub-files";
 const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -381,6 +382,7 @@ function resetWorkspace() {
   $("memories-view").hidden = true;
   $("admin-view").hidden = true;
   $("ai-view").hidden = true;
+  $("spirit-ai-view").hidden = true;
   clearReply();
 }
 
@@ -2930,6 +2932,162 @@ async function deleteFile(file) {
   refreshStorage();
   loadAdmin();
   toast(`Deleted ${file.name}`);
+}
+
+
+/* ---------- Separate online Spirit AI ---------- */
+const spiritAiKey = (channelId) => "spirithub-hub:spirit-ai:" + state.user.id + ":" + channelId;
+
+function spiritAiThreadFor(channelId) {
+  if (!state.spiritAiThreads.has(channelId)) state.spiritAiThreads.set(channelId, local.get(spiritAiKey(channelId)) || []);
+  return state.spiritAiThreads.get(channelId);
+}
+
+function renderSpiritAiView() {
+  const channel = state.channel;
+  if (!channel) return;
+  const input = el("input", {
+    id: "spirit-ai-input",
+    autocomplete: "off",
+    maxlength: 4000,
+    placeholder: "Ask Spirit AI about this room…",
+    "aria-label": "Ask Spirit AI",
+  });
+  const fileInput = el("input", {
+    type: "file",
+    accept: "application/pdf,image/png,image/jpeg,image/webp",
+    hidden: true,
+  });
+  const fileLabel = el("label", {
+    class: "attach spirit-ai-attach",
+    title: "Attach one PDF or image (up to 4 MB)",
+    "aria-label": "Attach a PDF or image",
+  }, fileInput, "＋");
+  const fileRow = el("div", { class: "spirit-ai-file-row", hidden: true });
+  const removeFile = el("button", {
+    class: "icon-btn",
+    type: "button",
+    "aria-label": "Remove attachment",
+  }, "×");
+  let attachedFile = null;
+  const setAttachedFile = (file) => {
+    attachedFile = file;
+    fileRow.hidden = !file;
+    fileRow.replaceChildren(
+      file ? el("span", { text: "📎 " + file.name + " · " + (file.size / 1024 / 1024).toFixed(1) + " MB" }) : null,
+      file ? removeFile : null,
+    );
+  };
+  removeFile.addEventListener("click", () => {
+    setAttachedFile(null);
+    fileInput.value = "";
+  });
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      fileInput.value = "";
+      return toast("Attach a PDF, PNG, JPEG, or WebP image.");
+    }
+    if (file.size > SPIRIT_AI_MAX_FILE_BYTES) {
+      fileInput.value = "";
+      return toast("Spirit AI accepts files up to 4 MB for now.");
+    }
+    setAttachedFile(file);
+  });
+  const form = el("form", {
+    class: "composer spirit-ai-form",
+    onsubmit: (event) => {
+      event.preventDefault();
+      if (state.spiritAiBusy) return;
+      const prompt = input.value.trim() || (attachedFile
+        ? "Read this file, solve the question, explain the steps, and include Python code when useful."
+        : "");
+      if (!prompt) return;
+      const file = attachedFile;
+      input.value = "";
+      setAttachedFile(null);
+      fileInput.value = "";
+      sendSpiritAi(prompt, file);
+    },
+  }, fileLabel, input, el("button", {
+    class: "send",
+    type: "submit",
+    "aria-label": "Ask Spirit AI",
+  }, "↗"));
+  $("spirit-ai-view").replaceChildren(
+    el("div", { class: "ai-top spirit-ai-top" },
+      el("div", {},
+        el("h3", { text: "Spirit AI" }),
+        el("p", { class: "muted small", text: "Online assistant for this room. Ask a question or attach a screenshot/PDF for explanations, solutions, and code." })),
+      el("div", { class: "ai-top-actions" },
+        el("span", { class: "spirit-ai-free-label", text: "Free tier" }),
+        el("button", { class: "btn small ghost", type: "button", onclick: () => clearSpiritAiThread(channel.id) }, "Clear chat"))),
+    el("p", { class: "spirit-ai-disclosure", text: "Questions and attachments are sent to Google Gemini. Free usage has limits, and Google may use free-tier content to improve its products. Avoid private or sensitive files." }),
+    el("div", { class: "ai-thread spirit-ai-thread", id: "spirit-ai-thread" }),
+    el("div", { class: "spirit-ai-composer-wrap" }, fileRow, form));
+  renderSpiritAiThread();
+}
+
+function renderSpiritAiThread() {
+  const box = $("spirit-ai-thread");
+  if (!box || !state.channel) return;
+  const thread = spiritAiThreadFor(state.channel.id);
+  if (!thread.length) {
+    box.replaceChildren(el("p", { class: "ai-empty" },
+      el("span", { "aria-hidden": "true", text: "✦" }),
+      "Ask a question or attach a Python problem screenshot. Spirit AI can explain the steps and write code. This chat stays private on this device."));
+    return;
+  }
+  box.replaceChildren(...thread.map((message) => {
+    if (message.role === "user") {
+      return el("div", { class: "ask-msg own spirit-ai-user" },
+        message.attachmentName ? el("span", { class: "spirit-ai-attachment-name", text: "📎 " + message.attachmentName }) : null,
+        el("span", { text: message.text }));
+    }
+    const node = el("div", {
+      class: "ask-msg md spirit-ai-answer" + (message.pending && message.text ? " is-streaming" : ""),
+      html: message.text ? markdown(message.text) : '<span class="busy-dot"></span>',
+    });
+    if (message.failed) node.setAttribute("role", "alert");
+    return node;
+  }));
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendSpiritAi(prompt, file) {
+  const channel = state.channel;
+  if (!channel || state.spiritAiBusy) return;
+  const thread = spiritAiThreadFor(channel.id);
+  const history = thread.filter((message) => !message.pending && !message.failed).slice(-8)
+    .map((message) => ({ role: message.role, text: message.text }));
+  const userMessage = { role: "user", text: prompt, ...(file ? { attachmentName: file.name } : {}) };
+  const answer = { role: "model", text: "", pending: true };
+  thread.push(userMessage, answer);
+  state.spiritAiBusy = true;
+  renderSpiritAiThread();
+  try {
+    answer.text = await requestSpiritAi(supabase, {
+      channelId: channel.id,
+      prompt,
+      history,
+      file,
+    });
+  } catch (error) {
+    answer.text = error.message || "Spirit AI couldn't answer right now.";
+    answer.failed = true;
+  } finally {
+    answer.pending = false;
+    state.spiritAiBusy = false;
+    local.set(spiritAiKey(channel.id), thread.slice(-40));
+    if (state.channel?.id === channel.id && state.tab === "spirit-ai") renderSpiritAiThread();
+  }
+}
+
+function clearSpiritAiThread(channelId) {
+  state.spiritAiThreads.set(channelId, []);
+  local.remove(spiritAiKey(channelId));
+  if (state.channel?.id === channelId && state.tab === "spirit-ai") renderSpiritAiThread();
 }
 
 /* ---------- Local AI ---------- */

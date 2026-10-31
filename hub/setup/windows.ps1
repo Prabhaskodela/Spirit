@@ -3,7 +3,7 @@
 # It installs Ollama if needed, lets the SpiritHUB website talk to it (kept after restarts),
 # restarts Ollama, downloads the AI model, and checks that SpiritHUB can reach it.
 $ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue" # the download progress bar makes Windows PowerShell download far slower
+$ProgressPreference = "SilentlyContinue" # PowerShell's own progress bar makes its downloads far slower; big ones use curl instead
 # Older Windows PowerShell may leave TLS 1.2 off, and ollama.com and GitHub require it.
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
 
@@ -18,20 +18,55 @@ function Assert-FreeSpace($gb, $what) {
   if ($free -lt $gb) { throw "Only $free GB of disk space is free on $($env:SystemDrive), and $what needs about $gb GB. Free up some space, then run this again." }
 }
 
+# Where Ollama is installed, or nothing. Its installer adds it to PATH, but this window
+# doesn't see PATH changes made after it opened, so look in the usual folders too.
+function Find-Ollama {
+  $found = Get-Command ollama -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($found) { return $found.Source }
+  foreach ($path in @((Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"), (Join-Path $env:ProgramFiles "Ollama\ollama.exe"))) {
+    if (Test-Path $path) { return $path }
+  }
+  return $null
+}
+
+# Downloads a big file with a progress bar: curl.exe comes with Windows 10 and 11, and BITS is the fallback.
+function Save-Download($url, $path) {
+  Remove-Item $path -ErrorAction SilentlyContinue
+  $curl = Get-Command curl.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($curl) {
+    & $curl.Source -L --fail --retry 3 -o $path $url
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host "  That download stopped. Trying another way..." -ForegroundColor Yellow
+    Remove-Item $path -ErrorAction SilentlyContinue
+  }
+  try {
+    $ProgressPreference = "Continue" # BITS shows a progress bar without slowing down
+    Start-BitsTransfer -Source $url -Destination $path -DisplayName "Downloading Ollama"
+  } catch {
+    $ProgressPreference = "SilentlyContinue"
+    Write-Host "  Downloading without a progress bar. Leave this window open; it can take 10 to 30 minutes..." -ForegroundColor Yellow
+    Invoke-WebRequest $url -OutFile $path -UseBasicParsing
+  }
+}
+
 Step "1 of 4 - Ollama"
-$found = Get-Command ollama -ErrorAction SilentlyContinue
-$exe = if ($found) { $found.Source } else { Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe" }
-if (Test-Path $exe) {
+$exe = Find-Ollama
+if ($exe) {
   Ok "Already installed"
 } else {
   Assert-FreeSpace 8 "installing Ollama"
-  Write-Host "  Downloading Ollama's official installer (about 1.7 GB). This can take a while..."
+  Write-Host "  Downloading Ollama's official installer (about 1.7 GB). The progress shows below."
   $setup = Join-Path $env:TEMP "OllamaSetup.exe"
-  Invoke-WebRequest "https://ollama.com/download/OllamaSetup.exe" -OutFile $setup -UseBasicParsing
-  Write-Host "  Installing..."
-  Start-Process $setup -ArgumentList "/VERYSILENT", "/NORESTART", "/SUPPRESSMSGBOXES" -Wait
+  Save-Download "https://ollama.com/download/OllamaSetup.exe" $setup
+  if ((Get-Item $setup).Length -lt 100MB) { throw "The Ollama download was cut off. Check your internet connection, then run this command again." }
+  Write-Host "  Installing Ollama. A small window shows the progress..."
+  # Wait for the installer itself only: it starts the Ollama app at the end, and that keeps running.
+  $installer = Start-Process $setup -ArgumentList "/SILENT", "/NORESTART", "/SUPPRESSMSGBOXES" -PassThru
+  $null = $installer.Handle # lets Windows PowerShell read the exit code afterwards
+  $installer.WaitForExit()
   Remove-Item $setup -ErrorAction SilentlyContinue
-  if (-not (Test-Path $exe)) { throw "Ollama didn't install. Install it from https://ollama.com/download, then run this command again." }
+  $exe = Find-Ollama
+  if (-not $exe) { throw "Ollama didn't install (the installer stopped with code $($installer.ExitCode)). Install it from https://ollama.com/download, then run this command again." }
   Ok "Installed"
 }
 

@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="hub.css?v=20261031-13">
+  <link rel="stylesheet" href="hub.css?v=20261031-14">
   <script type="module" src="hub.js?v=20261031-5"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
@@ -71,6 +71,10 @@
 
   <div class="app" id="app" hidden>
     <div class="nav" id="nav">
+    <div class="nav-brand" aria-label="SpiritHUB">
+      <img src="../icons/icon-192.png" alt="">
+      <span class="nav-brand-copy"><strong>SpiritHUB</strong><small>YOUR LEARNING SPACE</small></span>
+    </div>
       <nav class="rail" aria-label="Workspaces">
         <div class="rail-list" id="rail-list"></div>
         <button class="rail-btn add" id="new-workspace" type="button" title="Create a workspace" aria-label="Create a workspace">+</button>

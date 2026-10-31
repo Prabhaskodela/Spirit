@@ -1,6 +1,6 @@
 # SpiritHUB Workspaces
 
-Discord-style class spaces: **workspaces → semesters → subject channels**, with chat, PDF and screenshot sharing, invite links, and AI summaries made on each student's own laptop.
+A class collaboration space organized as **workspaces → semesters → subject channels**, with chat, PDF and screenshot sharing, invite links, and optional study tools.
 
 - **Admins** create the workspace with its academic year, add semesters (Sem 1, Sem 2…) and subject channels with course codes, reset the invite, make other admins, and remove people.
 - **Every member** can copy the invite link or code, join more workspaces with **↗**, and see the 100 MB storage meter. It turns amber at 80%, and admins get a **Free up space** link.

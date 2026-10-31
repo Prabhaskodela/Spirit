@@ -6,7 +6,7 @@ const allowedOrigins = new Set([
 const allowedMimeTypes = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp"]);
 const maxFileBytes = 4 * 1024 * 1024;
 const maxEncodedBytes = Math.ceil(maxFileBytes * 4 / 3) + 8;
-const model = "gemini-2.5-flash";
+const model = "gemini-3.5-flash-lite";
 const systemInstruction = [
   "You are Spirit AI, a clear study and coding helper.",
   "Explain solutions in understandable steps and provide correct Python code when a question asks for code.",

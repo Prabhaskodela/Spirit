@@ -371,6 +371,8 @@ function resetWorkspace() {
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
   clearTimeout(state.typingStopTimer);
   clearTimeout(state.presenceTrackTimer);
+  clearTimeout(typingIndicatorTimer);
+  typingIndicatorTimer = null;
   Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), onlineMembers: new Set(), presenceByMember: new Map(), presenceMeta: { seen_channel_id: null, seen_at: null }, typingByMember: new Map(), isTyping: false, lastTypingSignal: 0, typingStopTimer: null, presenceTrackTimer: null, lastPresenceTrack: 0, channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
   $("me-online").hidden = true;
   $("storage").hidden = true;
@@ -392,6 +394,8 @@ async function loadWorkspaces() {
 }
 
 let memberLoad = null;
+let typingIndicatorTimer = null;
+let seenPresenceFrame = 0;
 
 async function loadMembers(workspaceId = state.workspace?.id) {
   if (!workspaceId) return;
@@ -629,20 +633,37 @@ function renderTypingIndicator() {
   const node = $("typing-indicator");
   if (!node) return;
   const now = Date.now();
-  for (const [userId, presence] of state.typingByMember) if (presence.expires_at <= now) state.typingByMember.delete(userId);
-  const typing = [...state.typingByMember.entries()]
-    .filter(([userId, presence]) => userId !== state.user?.id && presence.channel_id === state.channel?.id && presence.expires_at > now)
-    .map(([userId]) => nameOf(userId));
-  node.hidden = !typing.length || state.tab !== "chat";
-  node.textContent = !typing.length ? "" : typing.length === 1 ? `${typing[0]} is typing…` : typing.length === 2 ? `${typing[0]} and ${typing[1]} are typing…` : `${typing.length} people are typing…`;
+  let nextExpiry = Infinity;
+  const typing = [];
+  for (const [userId, presence] of state.typingByMember) {
+    if (presence.expires_at <= now) {
+      state.typingByMember.delete(userId);
+      continue;
+    }
+    nextExpiry = Math.min(nextExpiry, presence.expires_at);
+    if (userId !== state.user?.id && presence.channel_id === state.channel?.id) typing.push(nameOf(userId));
+  }
+  const hidden = !typing.length || state.tab !== "chat";
+  const label = !typing.length ? "" : typing.length === 1 ? `${typing[0]} is typing…` : typing.length === 2 ? `${typing[0]} and ${typing[1]} are typing…` : `${typing.length} people are typing…`;
+  if (node.hidden !== hidden) node.hidden = hidden;
+  if (node.textContent !== label) node.textContent = label;
+  clearTimeout(typingIndicatorTimer);
+  typingIndicatorTimer = Number.isFinite(nextExpiry)
+    ? setTimeout(() => { typingIndicatorTimer = null; renderTypingIndicator(); }, Math.max(40, nextExpiry - now + 10))
+    : null;
 }
 
 function updateSeenPresence() {
   if (!state.channel || document.visibilityState !== "visible" || !$("messages")) return;
   const viewport = $("messages").getBoundingClientRect();
-  const visible = [...$("messages").querySelectorAll(".message[data-id]")]
-    .filter((node) => { const rect = node.getBoundingClientRect(); return rect.bottom > viewport.top && rect.top < viewport.bottom; })
-    .at(-1);
+  const messageNodes = $("messages").querySelectorAll(".message[data-id]");
+  let visible = null;
+  for (let index = messageNodes.length - 1; index >= 0; index -= 1) {
+    const candidate = messageNodes[index];
+    const rect = candidate.getBoundingClientRect();
+    if (rect.bottom <= viewport.top) break;
+    if (rect.top < viewport.bottom && rect.bottom > viewport.top) { visible = candidate; break; }
+  }
   const message = visible && state.messages.find((item) => item.id === visible.dataset.id);
   if (!message) return;
   const seenAt = message.created_at;
@@ -650,6 +671,14 @@ function updateSeenPresence() {
   state.presenceMeta.seen_channel_id = state.channel.id;
   state.presenceMeta.seen_at = seenAt;
   trackPresence();
+}
+
+function scheduleSeenPresence() {
+  if (seenPresenceFrame) return;
+  seenPresenceFrame = requestAnimationFrame(() => {
+    seenPresenceFrame = 0;
+    updateSeenPresence();
+  });
 }
 
 function subscribe(channelId) {
@@ -746,7 +775,7 @@ function renderSidebar() {
   const count = state.members.size;
   $("ws-name").textContent = workspace?.name || "SpiritHUB";
   $("ws-sub").textContent = workspace ? [workspace.academic_year, `${count} member${count === 1 ? "" : "s"}`].filter(Boolean).join(" · ") : "";
-  const channelRow = (channel) => {
+  const channelRow = (channel, subjectNumber) => {
     const unread = state.channelUnread.get(channel.id)?.count || 0;
     const channelName = channelDisplayName(channel.name);
     return el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}` },
@@ -755,11 +784,7 @@ function renderSidebar() {
         "aria-label": `${channelName}${unread ? `, ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
         onclick: () => openChannel(channel.id),
       },
-        el("span", { class: "hash channel-team-mark", "aria-hidden": "true" }, (() => {
-          const icon = $("members-toggle").querySelector("svg").cloneNode(true);
-          icon.querySelector("circle")?.remove();
-          return icon;
-        })()),
+        el("span", { class: "hash subject-number", "aria-hidden": "true", text: subjectNumber }),
         el("span", { class: "channel-copy" },
           el("span", { class: "channel-label", text: channelName }),
           channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
@@ -772,13 +797,13 @@ function renderSidebar() {
       el("span", { "aria-hidden": "true", text: "📷" }), "Memories"));
   }
   const loose = state.channels.filter((channel) => !channel.semester_id);
-  if (loose.length) tree.push(el("div", { class: "category" }, ...loose.map(channelRow)));
+  if (loose.length) tree.push(el("div", { class: "category" }, ...loose.map((channel, index) => channelRow(channel, index + 1))));
   for (const semester of state.semesters) {
     const channels = state.channels.filter((channel) => channel.semester_id === semester.id);
     tree.push(el("div", { class: "category" },
       el("div", { class: "category-head" }, el("span", { text: semester.name }),
         admin ? rowActions([[`Add a channel to ${semester.name}`, "+", () => addChannel(semester)], [`Rename ${semester.name}`, "✎", () => renameSemester(semester)], [`Delete ${semester.name}`, "✕", () => deleteSemester(semester)]]) : null),
-      ...channels.map(channelRow),
+      ...channels.map((channel, index) => channelRow(channel, index + 1)),
       channels.length ? null : el("p", { class: "category-empty", text: admin ? "No channels yet. Add one with +" : "No channels yet" })));
   }
   if (admin && state.workspace) tree.push(el("button", { class: "add-semester", type: "button", onclick: addSemester }, "+ Add semester"));
@@ -945,13 +970,35 @@ function showSeenBy(names) {
 function messageNode(message, grouped, reactions) {
   const name = nameOf(message.user_id);
   const file = message.file_id ? state.files.find((candidate) => candidate.id === message.file_id) : null;
-  const canDelete = message.user_id === state.user.id || state.role === "admin";
   const replied = message.reply_to_id ? state.messages.find((candidate) => candidate.id === message.reply_to_id) : null;
   const mentions = message.body && message.kind !== "sticker" ? findMentions(message.body) : [];
   const forMe = mentions.some((found) => found.user_id === state.user.id || found.user_ids?.includes(state.user.id)) || Boolean(message.mentions?.includes(state.user.id));
   const seenBy = message.user_id === state.user.id
     ? [...state.presenceByMember.entries()].filter(([userId, presence]) => userId !== state.user.id && presence.seen_channel_id === message.channel_id && Date.parse(presence.seen_at) >= Date.parse(message.created_at)).map(([userId]) => nameOf(userId))
     : [];
+  const actionsMenu = el("details", { class: "msg-menu" });
+  const actionsButton = el("summary", {
+    class: "msg-menu-trigger",
+    "aria-label": `More actions for ${nameOf(message.user_id)}'s message`,
+    title: "Message actions",
+  }, "⋯");
+  const runMessageAction = (action) => (event) => {
+    actionsMenu.open = false;
+    action(event);
+  };
+  const actionItems = [
+    el("button", { class: "text", type: "button", title: "Reply", onclick: runMessageAction(() => setReply(message)) }, "Reply"),
+    ...QUICK_REACTIONS.map((emoji) => el("button", { type: "button", title: `React with ${emoji}`, "aria-label": `React with ${emoji}`, onclick: runMessageAction(() => toggleReaction(message, emoji)) }, emoji)),
+    message.user_id === state.user.id
+      ? [
+          el("button", { class: "text", type: "button", title: "Delete for me", onclick: runMessageAction(() => hideMessageForMe(message)) }, "Delete for me"),
+          el("button", { class: "text danger-text", type: "button", title: "Unsend for everyone", onclick: runMessageAction(() => deleteMessage(message, file, true)) }, "Unsend"),
+        ]
+      : state.role === "admin"
+        ? el("button", { class: "text danger-text", type: "button", title: "Delete for everyone", onclick: runMessageAction(() => deleteMessage(message, file, true)) }, "Delete")
+        : null,
+  ];
+  actionsMenu.append(actionsButton, el("div", { class: "msg-actions", role: "group", "aria-label": "Message actions" }, ...actionItems));
   const node = el("article", { class: `message${message.user_id === state.user.id ? " own" : ""}${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
     grouped
       ? el("time", { class: "msg-time-gutter", datetime: message.created_at, text: shortTime(message.created_at) })
@@ -967,17 +1014,7 @@ function messageNode(message, grouped, reactions) {
       file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploading…" }) : null,
       seenBy.length ? el("button", { class: "message-seen", type: "button", title: `Seen by ${seenBy.join(", ")}`, "aria-label": `Seen by ${seenBy.length} ${seenBy.length === 1 ? "member" : "members"}`, onclick: () => showSeenBy(seenBy) }, seenBy.length === 1 ? `Seen by ${seenBy[0]}` : `Seen by ${seenBy.length} members`) : null,
       reactions?.length ? reactionsRow(message, reactions) : null),
-    el("div", { class: "msg-actions" },
-      el("button", { class: "text", type: "button", title: "Reply", onclick: () => setReply(message) }, "Reply"),
-      ...QUICK_REACTIONS.map((emoji) => el("button", { type: "button", title: `React with ${emoji}`, "aria-label": `React with ${emoji}`, onclick: () => toggleReaction(message, emoji) }, emoji)),
-      message.user_id === state.user.id
-        ? [
-            el("button", { class: "text", type: "button", title: "Delete for me", onclick: () => hideMessageForMe(message) }, "Delete for me"),
-            el("button", { class: "text danger-text", type: "button", title: "Unsend for everyone", onclick: () => deleteMessage(message, file, true) }, "Unsend")
-          ]
-        : state.role === "admin"
-          ? el("button", { class: "text danger-text", type: "button", title: "Delete for everyone", onclick: () => deleteMessage(message, file, true) }, "Delete")
-          : null));
+    actionsMenu);
   // Touch screens have no hover, so a tap shows the message's actions.
   node.addEventListener("click", (event) => {
     if (!event.target.closest("button, a, img, details, input")) node.classList.toggle("is-selected");
@@ -1419,8 +1456,10 @@ async function uploadFiles(files) {
     }
     upsertFile(row.data);
     backup.saveBlob(workspace.id, path, file).catch(() => {}); // your own uploads go into this device's backup straight away
-    state.storageUsed += file.size;
-    renderStorage();
+    if (state.workspace?.id === workspace.id) {
+      state.storageUsed += file.size;
+      renderStorage();
+    }
     const message = await supabase.from("hub_messages").insert({ workspace_id: workspace.id, channel_id: channel.id, file_id: row.data.id }).select().single();
     if (message.error) toast(message.error.message);
     else {
@@ -1476,7 +1515,8 @@ async function openFile(file) {
   const request = ++fileViewRequest;
   const viewer = $("file-viewer");
   const content = $("file-viewer-content");
-  $("file-viewer-title").textContent = file.name;
+  const title = file.name || file.caption || "Shared photo";
+  $("file-viewer-title").textContent = title;
   content.replaceChildren(el("p", { class: "file-viewer-loading", text: "Opening file…", role: "status" }));
   if (!viewer.open) viewer.showModal();
   try {
@@ -1485,16 +1525,18 @@ async function openFile(file) {
     if (request !== fileViewRequest || !viewer.open) return;
     let preview;
     if (file.mime.startsWith("image/")) {
-      preview = el("img", { class: "file-viewer-image", src: url, alt: file.name });
+      preview = el("img", { class: "file-viewer-image", src: url, alt: title });
     } else if (file.mime === "application/pdf") {
-      preview = el("iframe", { class: "file-viewer-pdf", src: url, title: file.name });
+      preview = el("iframe", { class: "file-viewer-pdf", src: url, title });
     } else {
       preview = el("p", { class: "file-viewer-loading", text: "Preview is not available for this file type." });
     }
     content.replaceChildren(preview);
   } catch (error) {
-    if (request === fileViewRequest && viewer.open) content.replaceChildren(el("p", { class: "file-viewer-error", text: error.message, role: "alert" }));
-    toast(error.message);
+    if (request === fileViewRequest && viewer.open) {
+      content.replaceChildren(el("p", { class: "file-viewer-error", text: error.message, role: "alert" }));
+      toast(error.message);
+    }
   }
 }
 
@@ -2254,8 +2296,10 @@ async function uploadMemories(files) {
       continue;
     }
     backup.saveBlob(workspace.id, path, file).catch(() => {});
-    state.storageUsed += file.size;
-    renderStorage();
+    if (state.workspace?.id === workspace.id) {
+      state.storageUsed += file.size;
+      renderStorage();
+    }
     if (state.view === "memories" && state.workspace?.id === workspace.id) {
       state.memories.unshift(row.data);
       renderMemories();
@@ -2948,8 +2992,7 @@ $("reply-cancel").addEventListener("click", clearReply);
 $("mention-button").addEventListener("click", startMention);
 $("message-input").addEventListener("input", updateMentionPicker);
 $("message-input").addEventListener("input", updateTypingPresence);
-$("messages").addEventListener("scroll", () => { updateSeenPresence(); }, { passive: true });
-setInterval(renderTypingIndicator, 700);
+$("messages").addEventListener("scroll", scheduleSeenPresence, { passive: true });
 $("message-input").addEventListener("click", updateMentionPicker);
 $("message-input").addEventListener("keydown", (event) => {
   if (!mention.items.length || event.isComposing) return;

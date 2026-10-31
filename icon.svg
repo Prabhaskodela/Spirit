@@ -12,8 +12,8 @@
   </defs>
   <rect width="128" height="128" rx="34" fill="#15151e"/>
   <rect width="128" height="128" rx="34" fill="url(#spirit-glow)"/>
-  <path d="M91 36c-8-8-20-12-32-9-15 3-24 13-22 24 2 10 12 14 27 18 15 4 25 9 24 21-1 13-15 22-31 22-11 0-21-4-28-12" fill="none" stroke="url(#spirit-gradient)" stroke-linecap="round" stroke-width="11"/>
-  <path d="M94 18l3.5 9.5L107 31l-9.5 3.5L94 44l-3.5-9.5L81 31l9.5-3.5L94 18Z" fill="#a4f0d1"/>
-  <circle cx="27" cy="80" r="3" fill="#ff6da8"/>
+  <path d="M99 34c-6-8-16-12-27-11-13 1-22 8-24 17-2 9 5 14 18 19 13 5 21 10 18 20-3 10-16 17-30 15-9-1-17-5-22-11" fill="none" stroke="url(#spirit-gradient)" stroke-linecap="round" stroke-width="9"/>
+  <path d="m84 23 3-7 3 7 7 3-7 3-3 7-3-7-7-3 7-3Zm23 0 3-7 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#d8d2e0"/>
+  <path d="M26 87c11-4 17-11 22-19" fill="none" stroke="url(#spirit-gradient)" stroke-linecap="round" stroke-width="5" opacity=".85"/>
 </svg>
 

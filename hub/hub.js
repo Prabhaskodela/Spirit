@@ -1524,31 +1524,72 @@ function renderBackground() {
 function photoField(label, path, round = false) {
   let picked = null;
   let removed = false;
+  let previewUrl = null;
+  const crop = { zoom: 1, x: 50, y: 50 };
   const preview = el("span", { class: `photo-preview${round ? " round" : ""}` });
-  const show = (url) => preview.replaceChildren(url ? el("img", { src: url, alt: "" }) : el("span", { text: "None" }));
-  show(null);
+  const cropControls = el("div", { class: "photo-crop-controls", hidden: true });
+  const show = (url) => {
+    preview.replaceChildren(url ? el("img", { src: url, alt: "" }) : el("span", { text: "None" }));
+    syncCropPreview();
+  };
+  function syncCropPreview() {
+    const image = preview.querySelector("img");
+    if (!image) return;
+    image.style.objectPosition = `${crop.x}% ${crop.y}%`;
+    image.style.transform = `scale(${crop.zoom})`;
+  }
   if (path) loadPhoto(path).then(show).catch(() => {});
   const remove = el("button", { class: "link small danger", type: "button", hidden: !path }, "Remove");
   const input = el("input", { type: "file", accept: MEMORY_TYPES.join(","), hidden: true });
+  const zoom = el("input", { type: "range", min: "1", max: "2.5", step: "0.05", value: "1", "aria-label": "Photo zoom" });
+  const horizontal = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo left or right" });
+  const vertical = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo up or down" });
+  const zoomValue = el("span", { text: "1×" });
+  const setControl = (name, input, value) => el("label", { class: "photo-crop-control" },
+    el("span", {}, el("span", { text: name }), value), input);
+  cropControls.append(
+    setControl("Zoom", zoom, zoomValue),
+    setControl("Horizontal", horizontal, el("span", { text: "Center" })),
+    setControl("Vertical", vertical, el("span", { text: "Center" })),
+    el("p", { class: "photo-crop-hint", text: "Adjust the framing before saving." }));
+  zoom.addEventListener("input", () => {
+    crop.zoom = Number(zoom.value);
+    zoomValue.textContent = `${crop.zoom.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}×`;
+    syncCropPreview();
+  });
+  horizontal.addEventListener("input", () => { crop.x = Number(horizontal.value); syncCropPreview(); });
+  vertical.addEventListener("input", () => { crop.y = Number(vertical.value); syncCropPreview(); });
   input.addEventListener("change", () => {
     const [file] = input.files;
     input.value = "";
     if (!file) return;
     if (!MEMORY_TYPES.includes(file.type)) return toast("Pick a photo (PNG, JPEG, WebP or GIF)");
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     [picked, removed] = [file, false];
-    show(URL.createObjectURL(file));
+    crop.zoom = 1; crop.x = 50; crop.y = 50;
+    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50"; zoomValue.textContent = "1×";
+    previewUrl = URL.createObjectURL(file);
+    show(previewUrl);
+    cropControls.hidden = !round;
     remove.hidden = false;
   });
   remove.addEventListener("click", () => {
     [picked, removed] = [null, true];
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = null;
     show(null);
+    cropControls.hidden = true;
     remove.hidden = true;
   });
   return {
-    node: el("div", { class: "field" }, el("span", { text: label }),
-      el("div", { class: "photo-row" }, preview, el("label", { class: "btn small ghost" }, path ? "Change" : "Choose photo", input), remove)),
-    // null when nothing changed, { file } for a new photo, { file: null } to remove it
-    change: () => (picked ? { file: picked } : removed ? { file: null } : null),
+    node: el("div", { class: `field photo-field${round ? " is-croppable" : ""}` },
+      el("span", { text: label }),
+      el("div", { class: "photo-row" }, preview,
+        el("label", { class: "btn small ghost photo-choose" }, path ? "Change photo" : "Choose photo", input),
+        remove),
+      cropControls),
+    // A selected profile photo includes its framing controls for the final square crop.
+    change: () => (picked ? { file: picked, crop: round ? { ...crop } : null } : removed ? { file: null } : null),
   };
 }
 
@@ -1563,13 +1604,52 @@ async function uploadPhoto(folder, kind, file, edge, square) {
 
 // Uploads the photos a dialog changed. Resolves to the new column values and the uploaded paths,
 // so a save that fails afterwards can remove them again.
+async function cropSquarePhoto(file, framing, edge) {
+  let source;
+  let objectUrl;
+  try {
+    if (typeof createImageBitmap === "function") source = await createImageBitmap(file);
+    else {
+      objectUrl = URL.createObjectURL(file);
+      source = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("Couldn't read this photo"));
+        image.src = objectUrl;
+      });
+    }
+    const width = source.width || source.naturalWidth;
+    const height = source.height || source.naturalHeight;
+    const side = Math.min(width, height) / framing.zoom;
+    const sx = (width - side) * framing.x / 100;
+    const sy = (height - side) * framing.y / 100;
+    const canvas = document.createElement("canvas");
+    canvas.width = edge;
+    canvas.height = edge;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Photo cropping isn't available in this browser");
+    context.drawImage(source, sx, sy, side, side, 0, 0, edge, edge);
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(
+      (result) => result ? resolve(result) : reject(new Error("Couldn't prepare this photo")),
+      "image/jpeg",
+      0.92));
+    return new File([blob], "profile-photo.jpg", { type: "image/jpeg", lastModified: Date.now() });
+  } finally {
+    source?.close?.();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
+
 async function savePhotos(folder, pickers) {
   const values = {};
   const uploaded = [];
   for (const { key, picker, kind, edge, square } of pickers) {
     const change = picker.change();
     if (!change) continue;
-    values[key] = change.file ? await uploadPhoto(folder, kind, change.file, edge, square) : null;
+    const file = change.file && change.crop
+      ? await cropSquarePhoto(change.file, change.crop, edge)
+      : change.file;
+    values[key] = file ? await uploadPhoto(folder, kind, file, edge, square) : null;
     if (values[key]) uploaded.push(values[key]);
   }
   return { values, uploaded };

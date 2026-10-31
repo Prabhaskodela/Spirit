@@ -4,9 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101116">
-  <meta name="description" content="SpiritHUB workspaces: semesters, subject channels, files and AI summaries for your class.">
+  <meta name="description" content="SpiritHUB Workspaces: class rooms for semesters, channels, shared files, conversations, and AI summaries.">
   <title>SpiritHUB Workspaces</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101116'/%3E%3Cpath d='m32 12 4.6 10.2L47 26l-10.4 3.8L32 40l-4.6-10.2L17 26l10.4-3.8Z' fill='%23ff6da8'/%3E%3Cpath d='m45 38 2.3 5.1L52 45l-4.7 1.9L45 52l-2.3-5.1L38 45l4.7-1.9Z' fill='%23a4f0d1'/%3E%3C/svg%3E">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="../icons/icon-192.png">
+  <link rel="icon" href="../icons/icon-192.png" type="image/png" sizes="192x192">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
@@ -28,7 +30,7 @@
 <body>
   <section class="center-screen" id="setup" hidden>
     <div class="card">
-      <div class="brand"><span class="brand-script">Spirit</span><span class="brand-hub">HUB</span></div>
+      <div class="brand"><img class="brand-wordmark" src="../spirit-wordmark.png" alt="SpiritHUB Workspaces"></div>
       <h1>Connect your Supabase project</h1>
       <ol class="steps">
         <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>.</li>
@@ -41,7 +43,7 @@
 
   <section class="center-screen" id="auth" hidden>
     <form class="card auth-card" id="auth-form">
-      <div class="brand"><span class="brand-script">Spirit</span><span class="brand-hub">HUB</span></div>
+      <div class="brand"><img class="brand-wordmark" src="../spirit-wordmark.png" alt="SpiritHUB Workspaces"></div>
       <p class="invite-note" id="invite-note" hidden></p>
       <h1 id="auth-title">Welcome back</h1>
       <p class="muted" id="auth-sub">Sign in to your workspaces.</p>

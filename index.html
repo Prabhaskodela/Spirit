@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101116">
-  <meta name="description" content="Spirit is your semester's shared space for notes, conversations, and memories.">
+  <meta name="description" content="SpiritHUB is your semester's shared space for notes, conversations, and memories.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Spirit</title>
+  <title>SpiritHUB</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -17,12 +17,12 @@
 <body>
   <div class="app-frame">
     <header class="topbar">
-      <a class="brand" href="#" aria-label="Spirit home"><img class="brand-symbol" src="icon.svg" alt=""><span>spirit<span class="brand-period">.</span></span></a>
+      <a class="brand" href="#" aria-label="SpiritHUB home"><img class="brand-symbol" src="icon.svg" alt=""><span>Spirit<span class="brand-hub">HUB</span></span></a>
       <p class="topline">YOUR PEOPLE. YOUR SEMESTER.</p>
-      <button class="install-button" id="install-app" type="button" hidden>Install Spirit <span>↗</span></button>
+      <button class="install-button" id="install-app" type="button" hidden>Install SpiritHUB <span>↗</span></button>
       <div class="account-area" id="account-area" hidden><button class="notification-button" id="notifications-open" type="button" aria-label="Notifications">♧<span class="notification-count" id="notification-count" hidden>0</span></button><span class="avatar" id="user-avatar">S</span><button class="account-name" id="account-name" type="button"></button><button class="quiet-button" id="sign-out" type="button">Sign out</button></div>
     </header>
-    <div class="offline-banner" id="offline-banner" role="status" hidden>You’re offline. Spirit’s shared rooms, chat, and files need an internet connection.</div>
+    <div class="offline-banner" id="offline-banner" role="status" hidden>You’re offline. SpiritHUB’s shared rooms, chat, and files need an internet connection.</div>
 
     <section class="auth-wrap" id="auth-screen">
       <div class="auth-card">
@@ -78,7 +78,7 @@
         </section>
       </main>
     </div>
-    <footer class="app-footer"><span>SPIRIT</span><span>Made for shared semesters.</span></footer>
+    <footer class="app-footer"><span>SPIRITHUB</span><span>Made for shared semesters.</span></footer>
   </div>
 
   <dialog class="modal" id="profile-dialog"><form id="profile-form" method="dialog"><button class="modal-close" type="button" data-close="profile-dialog" aria-label="Close">×</button><p class="eyebrow">MAKE IT YOURS</p><h2>What should your room call you?</h2><p class="modal-copy">Your email stays private. This is the name classmates see.</p><label class="form-label" for="display-name">Display name</label><input class="text-input" id="display-name" maxlength="32" required placeholder="e.g. Aanya Sharma"><label class="form-label" for="birthday">Birthday <span class="optional">OPTIONAL · ONLY DAY & MONTH ARE SAVED</span></label><input class="text-input" id="birthday" type="date"><button class="primary-button modal-submit" type="submit">Save my name <span>↗</span></button></form></dialog>

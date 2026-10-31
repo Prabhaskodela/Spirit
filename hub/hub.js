@@ -2945,10 +2945,12 @@ async function deleteFile(file) {
 
 /* ---------- Workspace-level online Spirit AI ---------- */
 const spiritAiKey = (workspaceId) => "spirithub-hub:spirit-ai:" + state.user.id + ":" + workspaceId;
+const spiritAiThreadId = (workspaceId) => state.user.id + ":" + workspaceId;
 
 function spiritAiThreadFor(workspaceId) {
-  if (!state.spiritAiThreads.has(workspaceId)) state.spiritAiThreads.set(workspaceId, local.get(spiritAiKey(workspaceId)) || []);
-  return state.spiritAiThreads.get(workspaceId);
+  const threadId = spiritAiThreadId(workspaceId);
+  if (!state.spiritAiThreads.has(threadId)) state.spiritAiThreads.set(threadId, local.get(spiritAiKey(workspaceId)) || []);
+  return state.spiritAiThreads.get(threadId);
 }
 
 function openSpiritAi() {
@@ -3046,7 +3048,7 @@ function renderSpiritAiView() {
     el("div", { class: "ai-top spirit-ai-top" },
       el("div", {},
         el("h3", { text: "Spirit AI" }),
-        el("p", { class: "muted small", text: "A private assistant for this workspace. Ask questions or attach a screenshot/PDF for explanations, solutions, and code." })),
+        el("p", { class: "muted small", text: "Each member has a separate Spirit AI chat. Only you can see your history on this device. Ask questions or attach a screenshot/PDF for explanations, solutions, and code." })),
       el("div", { class: "ai-top-actions" },
         el("span", { class: "spirit-ai-free-label", text: "Free tier" }),
         el("button", { class: "btn small ghost", type: "button", onclick: () => clearSpiritAiThread(workspace.id) }, "Clear chat"))),
@@ -3113,7 +3115,7 @@ async function sendSpiritAi(prompt, file) {
 }
 
 function clearSpiritAiThread(workspaceId) {
-  state.spiritAiThreads.set(workspaceId, []);
+  state.spiritAiThreads.set(spiritAiThreadId(workspaceId), []);
   local.remove(spiritAiKey(workspaceId));
   if (state.workspace?.id === workspaceId && state.view === "spirit-ai") renderSpiritAiThread();
 }

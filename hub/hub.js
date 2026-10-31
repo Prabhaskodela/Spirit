@@ -776,15 +776,18 @@ function renderSidebar() {
   $("ws-name").textContent = workspace?.name || "SpiritHUB";
   $("ws-sub").textContent = workspace ? [workspace.academic_year, `${count} member${count === 1 ? "" : "s"}`].filter(Boolean).join(" · ") : "";
   const channelRow = (channel, subjectNumber) => {
+    const isUnsemesteredChitChat = !channel.semester_id && String(channel.name || "").trim().toLocaleLowerCase() === "chit chat";
     const unread = state.channelUnread.get(channel.id)?.count || 0;
     const channelName = channelDisplayName(channel.name);
-    return el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}` },
+    return el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}${isUnsemesteredChitChat ? " is-chit-chat" : ""}` },
       el("button", {
-        class: "channel-link", type: "button", title: `${channelName}${unread ? ` · ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
+        class: `channel-link${isUnsemesteredChitChat ? " chit-chat-link" : ""}`, type: "button", title: `${channelName}${unread ? ` · ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
         "aria-label": `${channelName}${unread ? `, ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
         onclick: () => openChannel(channel.id),
       },
-        el("span", { class: "hash subject-number", "aria-hidden": "true", text: subjectNumber }),
+        isUnsemesteredChitChat
+          ? el("span", { class: "channel-group-logo", "aria-hidden": "true" }, workspaceIcon(workspace))
+          : el("span", { class: "hash subject-number", "aria-hidden": "true", text: subjectNumber }),
         el("span", { class: "channel-copy" },
           el("span", { class: "channel-label", text: channelName }),
           channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
@@ -816,13 +819,14 @@ function renderHeader() {
   document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
   const channelMark = $("channel-hash");
-  channelMark.classList.toggle("team-logo", Boolean(channel && !special));
+  const isUnsemesteredChitChat = Boolean(channel && !channel.semester_id && String(channel.name || "").trim().toLocaleLowerCase() === "chit chat");
+  const channelNumber = channel
+    ? state.channels.filter((candidate) => candidate.semester_id === channel.semester_id).findIndex((candidate) => candidate.id === channel.id) + 1
+    : 0;
+  channelMark.classList.toggle("team-logo", isUnsemesteredChitChat);
   if (special) channelMark.textContent = special[0];
-  else if (channel) {
-    const teamIcon = $("members-toggle").querySelector("svg").cloneNode(true);
-    teamIcon.querySelector("circle")?.remove();
-    channelMark.replaceChildren(teamIcon);
-  }
+  else if (isUnsemesteredChitChat) channelMark.replaceChildren(workspaceIcon(state.workspace));
+  else if (channel) channelMark.textContent = String(channelNumber).padStart(2, "0");
   else channelMark.replaceChildren();
   channelMark.hidden = !channel && !special;
   $("channel-name").textContent = special ? special[1] : channelDisplayName(channel?.name || "");

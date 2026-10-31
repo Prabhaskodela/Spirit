@@ -3,9 +3,24 @@
   "name": "SpiritHUB Workspaces",
   "short_name": "SpiritHUB",
   "description": "SpiritHUB Workspaces: class rooms for semesters, channels, shared files, conversations, and AI summaries.",
+  "lang": "en",
+  "dir": "ltr",
   "start_url": "/Spirit/hub/",
   "scope": "/Spirit/hub/",
   "display": "standalone",
+  "display_override": [
+    "standalone"
+  ],
+  "orientation": "any",
+  "categories": [
+    "education",
+    "social"
+  ],
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing"
+    ]
+  },
   "background_color": "#101116",
   "theme_color": "#101116",
   "icons": [

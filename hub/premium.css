@@ -753,6 +753,17 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 .profile-account{display:grid;gap:5px;padding:10px 12px;border:1px solid #68554b55;border-radius:10px;background:#201a18}
 .profile-account>span{color:#b5aaa4;font-size:11px;font-weight:600}
 .profile-account>strong{color:#f0e8e8;font-size:13px;line-height:1.4;overflow-wrap:anywhere;user-select:text}
+.profile-tools{display:grid;gap:8px;margin-top:12px;padding:12px;border:1px solid #68554b55;border-radius:12px;background:#201a18}
+.profile-ai-status{display:flex;align-items:center;gap:8px;min-width:0;color:#b5aaa4;font-size:12px}
+.profile-ai-status .dot{background:#dea157}
+.profile-ai-status[data-state=ready] .dot{background:#a6bd80;box-shadow:0 0 8px #a6bd8066}
+.profile-ai-status>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-action{display:flex;align-items:center;gap:10px;width:100%;min-height:40px;padding:0 11px;border:1px solid #68554b44;border-radius:9px;background:#282020;color:#f0e8e8;text-align:left}
+.profile-action:hover{border-color:#c0782870;background:#30241d}
+.profile-action-icon{display:grid;place-items:center;width:22px;height:22px;flex:0 0 22px;color:#e0ad6c;font-size:16px}
+.profile-action.is-danger{color:#e5b5aa}
+.profile-action.is-danger .profile-action-icon{color:#e5a094}
+.profile-action.is-danger:hover{border-color:#a34e3570;background:#382220}
 .composer>input:focus,.composer>input:focus-visible{outline:none!important;box-shadow:none!important}
 .composer:focus-within{border-color:#c07828;box-shadow:0 0 0 2px #c0782818,0 14px 38px #05030291}
 

@@ -23,8 +23,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="hub.css?v=20261031-27">
-  <link rel="stylesheet" href="premium.css?v=20261031-18">
-  <script type="module" src="hub.js?v=20261031-21"></script>
+  <link rel="stylesheet" href="premium.css?v=20261031-19">
+  <script type="module" src="hub.js?v=20261031-22"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -103,9 +103,7 @@
         </div>
         <footer class="me">
           <span class="avatar" id="me-avatar">S</span>
-          <button class="me-copy" id="profile-btn" type="button" title="Edit your profile"><strong id="me-name"></strong><small id="ai-status"><span class="dot"></span><span id="ai-label">Local AI: checking…</span></small></button>
-          <button class="icon-btn" id="ai-settings" type="button" title="Local AI settings" aria-label="Local AI settings">⚙</button>
-          <button class="icon-btn" id="sign-out" type="button" title="Sign out" aria-label="Sign out">⏻</button>
+          <button class="me-copy" id="profile-btn" type="button" title="Profile and account settings"><strong id="me-name"></strong></button>
         </footer>
       </aside>
     </div>

@@ -1769,17 +1769,39 @@ const removeUploads = (paths) => (paths.length ? supabase.storage.from(BUCKET).r
 
 async function editProfile() {
   const profile = state.profile;
+  let chosenProfileAction = null;
   const pad = (value) => String(value).padStart(2, "0");
   const photo = photoField("Profile photo (classmates see it next to your messages)", profile.avatar_path, true);
   const name = el("input", { class: "input", maxlength: 40, value: profile.display_name, required: true });
   // The year is a placeholder (2000 has a 29 February); only the month and day are saved, like the original app.
   const birthday = el("input", { class: "input", type: "date", value: profile.birth_month ? `2000-${pad(profile.birth_month)}-${pad(profile.birth_day)}` : "" });
+  const aiStatus = state.ai.caps;
+  const aiSummary = el("div", {
+    class: "profile-ai-status", id: "profile-ai-status",
+    "data-state": aiStatus ? (aiStatus.ok ? "ready" : "off") : "checking",
+    title: aiStatus?.ok ? `Ollama ${aiStatus.version} · ${aiStatus.model}${aiStatus.vision ? " · reads images" : ""}` : "Local AI runs on your laptop",
+  },
+    el("span", { class: "dot", "aria-hidden": "true" }),
+    el("span", { id: "profile-ai-label", text: aiStatus ? (aiStatus.ok ? `Local AI: ${aiStatus.model}` : "Local AI: not connected") : "Local AI: checking…" }));
+  const profileActionButton = (action, icon, label) => el("button", {
+    class: `profile-action${action === "signout" ? " is-danger" : ""}`,
+    type: "button",
+    onclick: () => { chosenProfileAction = action; $("dialog").close("cancel"); },
+  }, el("span", { class: "profile-action-icon", "aria-hidden": "true", text: icon }), el("span", { text: label }));
   const body = el("div", { class: "dialog-fields" },
     el("div", { class: "profile-account" }, el("span", { text: "Signed in with" }), el("strong", { text: state.user?.email || "Email unavailable" })),
+    el("section", { class: "profile-tools", "aria-label": "Account tools" },
+      aiSummary,
+      profileActionButton("ai", "⚙", "Local AI settings"),
+      profileActionButton("signout", "⏻", "Sign out")),
     photo.node,
     field("Display name (what your classmates see)", name),
     field("Birthday (optional, only the day and month are kept)", birthday));
-  if (!(await ask({ title: "Your profile", body, okLabel: "Save" }))) return;
+  if (!(await ask({ title: "Your profile", body, okLabel: "Save" }))) {
+    if (chosenProfileAction === "ai") return openAiSettings();
+    if (chosenProfileAction === "signout") return signOut();
+    return;
+  }
   const [, month, day] = birthday.value ? birthday.value.split("-").map(Number) : [];
   const changes = { display_name: name.value.trim() || profile.display_name };
   if (month || profile.birth_month) Object.assign(changes, { birth_month: month || null, birth_day: day || null });
@@ -1805,6 +1827,16 @@ async function editProfile() {
   renderMembers();
   renderMessages();
   toast("Profile saved");
+}
+
+async function signOut() {
+  const forget = el("input", { type: "checkbox" });
+  const body = el("div", { class: "dialog-fields" },
+    el("p", { class: "muted", text: "You can sign back in on any device with your email and password." }),
+    el("label", { class: "check" }, forget, "Also delete the backup on this device (for shared computers)"));
+  if (!(await ask({ title: "Sign out?", body, okLabel: "Sign out" }))) return;
+  if (forget.checked) await backup.forget().catch(() => {});
+  await supabase.auth.signOut();
 }
 
 /* ---------- Replies, reactions, emoji, stickers and GIFs (as in the original app) ---------- */
@@ -2548,10 +2580,13 @@ async function deleteFile(file) {
 async function refreshAi() {
   const result = await checkAi(state.ai.settings);
   state.ai.caps = result;
-  const status = $("ai-status");
-  status.dataset.state = result.ok ? "ready" : "off";
-  $("ai-label").textContent = result.ok ? `Local AI: ${result.model}` : "Local AI: not connected";
-  status.title = result.ok ? `Ollama ${result.version} · ${result.model}${result.vision ? " · reads images" : ""}` : "Click ⚙ to connect the model on your laptop";
+  const status = $("profile-ai-status");
+  const label = $("profile-ai-label");
+  if (status && label) {
+    status.dataset.state = result.ok ? "ready" : "off";
+    label.textContent = result.ok ? `Local AI: ${result.model}` : "Local AI: not connected";
+    status.title = result.ok ? `Ollama ${result.version} · ${result.model}${result.vision ? " · reads images" : ""}` : "Local AI runs on your laptop";
+  }
   return result;
 }
 
@@ -2747,16 +2782,6 @@ $("gif-input").addEventListener("change", (event) => {
   if (file.type !== "image/gif") return toast("Pick a .gif file");
   if (file.size > MAX_GIF) return toast("GIFs can be up to 5 MB");
   uploadFiles([file]);
-});
-$("ai-settings").addEventListener("click", openAiSettings);
-$("sign-out").addEventListener("click", async () => {
-  const forget = el("input", { type: "checkbox" });
-  const body = el("div", { class: "dialog-fields" },
-    el("p", { class: "muted", text: "You can sign back in on any device with your email and password." }),
-    el("label", { class: "check" }, forget, "Also delete the backup on this device (for shared computers)"));
-  if (!(await ask({ title: "Sign out?", body, okLabel: "Sign out" }))) return;
-  if (forget.checked) await backup.forget().catch(() => {});
-  await supabase.auth.signOut();
 });
 $("menu-toggle").addEventListener("click", () => {
   const open = $("app").classList.toggle("nav-open");

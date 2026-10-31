@@ -1142,3 +1142,6 @@ body{background:radial-gradient(ellipse at 0% 0%,#30215366,transparent 38rem),ra
 @media(prefers-reduced-motion:reduce){
   .rail-btn,.channel,.memories-link,.btn,.tab,.reaction,.msg-actions,.composer,.attach,.tool,.send,.photo-preview img{transition:none!important}
 }
+
+.photo-field.is-croppable .photo-preview.round{width:104px;height:104px}
+@media(max-width:440px){.photo-field.is-croppable .photo-preview.round{width:88px;height:88px}}

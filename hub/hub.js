@@ -1004,23 +1004,24 @@ function messageNode(message, grouped, reactions) {
   ];
   actionsMenu.append(actionsButton, el("div", { class: "msg-actions", role: "group", "aria-label": "Message actions" }, ...actionItems));
   const ownMessage = message.user_id === state.user.id;
-  const main = el("div", { class: "msg-main" },
-      message.reply_to_id
-        ? el("button", { class: "quote", type: "button", title: "Show the original message", onclick: () => jumpTo(message.reply_to_id) }, "↪",
-          replied ? [el("strong", { text: nameOf(replied.user_id) }), el("span", { text: preview(replied) })] : el("span", { text: "Earlier message" }))
-        : null,
-      grouped ? null : el("div", { class: "msg-meta" }, el("strong", { text: name }), el("time", { datetime: message.created_at, text: timeLabel(message.created_at) })),
-      forMe ? el("span", { class: "mention-label", text: "Mentioned you" }) : null,
-      message.kind === "sticker" ? stickerNode(message.body) : message.body ? bodyNode(message.body, mentions) : null,
-      file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploading…" }) : null,
-      seenBy.length ? el("button", { class: "message-seen", type: "button", title: `Seen by ${seenBy.join(", ")}`, "aria-label": `Seen by ${seenBy.length} ${seenBy.length === 1 ? "member" : "members"}`, onclick: () => showSeenBy(seenBy) }, seenBy.length === 1 ? `Seen by ${seenBy[0]}` : `Seen by ${seenBy.length} members`) : null,
-      reactions?.length ? reactionsRow(message, reactions) : null);
+  const meta = grouped ? null : el("div", { class: "msg-meta" }, el("strong", { text: name }), el("time", { datetime: message.created_at, text: timeLabel(message.created_at) }));
+  const content = el("div", { class: "msg-content" },
+    message.reply_to_id
+      ? el("button", { class: "quote", type: "button", title: "Show the original message", onclick: () => jumpTo(message.reply_to_id) }, "↪",
+        replied ? [el("strong", { text: nameOf(replied.user_id) }), el("span", { text: preview(replied) })] : el("span", { text: "Earlier message" }))
+      : null,
+    forMe ? el("span", { class: "mention-label", text: "Mentioned you" }) : null,
+    message.kind === "sticker" ? stickerNode(message.body) : message.body ? bodyNode(message.body, mentions) : null,
+    file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploading…" }) : null,
+    seenBy.length ? el("button", { class: "message-seen", type: "button", title: `Seen by ${seenBy.join(", ")}`, "aria-label": `Seen by ${seenBy.length} ${seenBy.length === 1 ? "member" : "members"}`, onclick: () => showSeenBy(seenBy) }, seenBy.length === 1 ? `Seen by ${seenBy[0]}` : `Seen by ${seenBy.length} members`) : null,
+    reactions?.length ? reactionsRow(message, reactions) : null);
+  const contentRow = el("div", { class: "msg-content-row" }, content, actionsMenu);
+  const main = el("div", { class: "msg-main" }, meta, contentRow);
   const node = el("article", { class: `message${ownMessage ? " own" : ""}${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
     grouped
       ? el("time", { class: "msg-time-gutter", datetime: message.created_at, text: shortTime(message.created_at) })
       : avatarNode(personOf(message.user_id)),
-    ownMessage ? el("div", { class: "own-message-row" }, main, actionsMenu) : main,
-    ownMessage ? null : actionsMenu);
+    main);
   // Touch screens have no hover, so a tap shows the message's actions.
   node.addEventListener("click", (event) => {
     if (!event.target.closest("button, a, img, details, input")) node.classList.toggle("is-selected");

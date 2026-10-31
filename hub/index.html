@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101116">
+  <meta name="description" content="SpiritHUB workspaces: semesters, subject channels, files and AI summaries for your class.">
+  <title>SpiritHUB Workspaces</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101116'/%3E%3Cpath d='m32 12 4.6 10.2L47 26l-10.4 3.8L32 40l-4.6-10.2L17 26l10.4-3.8Z' fill='%23ff6da8'/%3E%3Cpath d='m45 38 2.3 5.1L52 45l-4.7 1.9L45 52l-2.3-5.1L38 45l4.7-1.9Z' fill='%23a4f0d1'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="hub.css">
+  <script type="module" src="hub.js"></script>
+</head>
+<body>
+  <section class="center-screen" id="setup" hidden>
+    <div class="card">
+      <div class="brand"><span class="brand-script">Spirit</span><span class="brand-hub">HUB</span></div>
+      <h1>Connect your Supabase project</h1>
+      <ol class="steps">
+        <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>.</li>
+        <li>Open <strong>SQL Editor</strong>, paste <code>hub/schema.sql</code> and run it.</li>
+        <li>In <strong>Authentication → Sign In / Providers</strong>, turn off <strong>Confirm email</strong>.</li>
+        <li>Copy the project URL and anon (public) key from <strong>Project Settings → API</strong> into <code>hub/config.js</code>, then reload.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="center-screen" id="auth" hidden>
+    <form class="card auth-card" id="auth-form">
+      <div class="brand"><span class="brand-script">Spirit</span><span class="brand-hub">HUB</span></div>
+      <p class="invite-note" id="invite-note" hidden></p>
+      <h1 id="auth-title">Welcome back</h1>
+      <p class="muted" id="auth-sub">Sign in to your workspaces.</p>
+      <label class="field" id="name-field" hidden><span>Display name</span><input class="input" id="auth-name" maxlength="40" autocomplete="nickname" placeholder="What your class calls you"></label>
+      <label class="field"><span>Email</span><input class="input" id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <label class="field"><span>Password</span><input class="input" id="auth-password" type="password" required minlength="8" autocomplete="current-password" placeholder="At least 8 characters"></label>
+      <p class="form-error" id="auth-error" role="alert" hidden></p>
+      <button class="btn primary wide" id="auth-submit" type="submit">Sign in</button>
+      <p class="auth-switch"><span id="auth-switch-text">New here?</span> <button type="button" class="link" id="auth-switch">Create an account</button></p>
+    </form>
+  </section>
+
+  <div class="app" id="app" hidden>
+    <div class="nav" id="nav">
+      <nav class="rail" aria-label="Workspaces">
+        <span class="rail-mark" aria-hidden="true">✳</span>
+        <div class="rail-list" id="rail-list"></div>
+        <button class="rail-btn add" id="new-workspace" type="button" title="Create a workspace" aria-label="Create a workspace">+</button>
+        <button class="rail-btn join" id="join-workspace" type="button" title="Join with an invite code" aria-label="Join with an invite code">↗</button>
+      </nav>
+      <aside class="sidebar">
+        <header class="ws-header">
+          <button class="ws-name" id="ws-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"><span class="ws-title"><span id="ws-name">SpiritHUB</span><small id="ws-sub"></small></span><span aria-hidden="true">▾</span></button>
+          <div class="ws-menu" id="ws-menu" role="menu" hidden>
+            <button type="button" role="menuitem" data-ws="invite">Invite people</button>
+            <button type="button" role="menuitem" data-ws="settings">Workspace settings</button>
+            <button type="button" role="menuitem" data-ws="semester">Add semester</button>
+            <button type="button" role="menuitem" data-ws="channel">Add workspace channel</button>
+            <button type="button" role="menuitem" data-ws="backup">Download backup</button>
+            <button type="button" role="menuitem" data-ws="leave" class="danger">Leave workspace</button>
+            <button type="button" role="menuitem" data-ws="delete" class="danger">Delete workspace</button>
+          </div>
+        </header>
+        <div class="channel-tree" id="channel-tree"></div>
+        <div class="storage" id="storage" hidden>
+          <span id="storage-label">Workspace files</span>
+          <span class="storage-track" id="storage-meter" role="meter" aria-label="Workspace storage used" aria-valuemin="0" aria-valuemax="100"><span id="storage-fill"></span></span>
+        </div>
+        <footer class="me">
+          <span class="avatar" id="me-avatar">S</span>
+          <button class="me-copy" id="profile-btn" type="button" title="Edit your profile"><strong id="me-name"></strong><small id="ai-status"><span class="dot"></span><span id="ai-label">Local AI: checking…</span></small></button>
+          <button class="icon-btn" id="ai-settings" type="button" title="Local AI settings" aria-label="Local AI settings">⚙</button>
+          <button class="icon-btn" id="sign-out" type="button" title="Sign out" aria-label="Sign out">⏻</button>
+        </footer>
+      </aside>
+    </div>
+
+    <main class="main">
+      <header class="channel-header">
+        <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-label="Show workspaces and channels">☰</button>
+        <h2 class="channel-title"><span class="hash" id="channel-hash">#</span><span id="channel-name"></span></h2>
+        <span class="channel-sem" id="channel-sem"></span>
+        <span class="channel-code" id="channel-code"></span>
+        <div class="tabs" role="tablist">
+          <button class="tab is-active" type="button" role="tab" data-tab="chat" aria-selected="true">Chat</button>
+          <button class="tab" type="button" role="tab" data-tab="files" aria-selected="false">Files <span class="count" id="file-count"></span></button>
+        </div>
+        <button class="icon-btn bell" id="notifications-btn" type="button" title="Notifications" aria-label="Notifications" hidden><span aria-hidden="true">🔔</span><span class="unread" id="unread-count" hidden></span></button>
+        <button class="icon-btn members-toggle" id="members-toggle" type="button" title="Members" aria-label="Show members">👥</button>
+      </header>
+
+      <section class="chat" id="chat-view">
+        <div class="messages" id="messages"></div>
+        <div class="reply-bar" id="reply-bar" hidden><span id="reply-label"></span><button class="icon-btn" id="reply-cancel" type="button" aria-label="Cancel reply">×</button></div>
+        <form class="composer" id="composer">
+          <label class="attach" title="Upload PDFs or images" aria-label="Upload PDFs or images"><input type="file" id="file-input" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" multiple hidden>＋</label>
+          <label class="tool" title="Send a GIF (up to 5 MB)" aria-label="Send a GIF"><input type="file" id="gif-input" accept="image/gif" hidden>GIF</label>
+          <input id="message-input" autocomplete="off" maxlength="4000" placeholder="Message">
+          <button class="tool" id="emoji-button" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">😊</button>
+          <button class="tool" id="sticker-button" type="button" title="Stickers" aria-label="Stickers" aria-expanded="false">✦</button>
+          <button class="send" type="submit" aria-label="Send">↗</button>
+          <div class="picker" id="emoji-picker" hidden></div>
+          <div class="picker sticker-picker" id="sticker-picker" hidden></div>
+        </form>
+      </section>
+
+      <section class="files" id="files-view" hidden></section>
+
+      <section class="memories" id="memories-view" hidden></section>
+
+      <section class="empty-main" id="empty-main" hidden>
+        <div class="empty-glyph">✳</div>
+        <h2>No workspace yet</h2>
+        <p class="muted">Create one for your class, or open an invite link from your admin.</p>
+        <button class="btn primary" id="empty-create" type="button">Create a workspace</button>
+      </section>
+    </main>
+
+    <aside class="members" id="members-panel" aria-label="Members"></aside>
+    <div class="scrim" id="scrim"></div>
+  </div>
+
+  <dialog class="modal" id="dialog">
+    <form method="dialog" id="dialog-form">
+      <h3 id="dialog-title"></h3>
+      <div id="dialog-body"></div>
+      <input class="input" id="dialog-input" hidden>
+      <div class="modal-actions">
+        <button class="btn ghost" id="dialog-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="dialog-ok" value="ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

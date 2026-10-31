@@ -829,7 +829,7 @@ function messageNode(message, grouped, reactions) {
   const canDelete = message.user_id === state.user.id || state.role === "admin";
   const replied = message.reply_to_id ? state.messages.find((candidate) => candidate.id === message.reply_to_id) : null;
   const mentions = message.body && message.kind !== "sticker" ? findMentions(message.body) : [];
-  const forMe = mentions.some((found) => found.user_id === state.user.id) || Boolean(message.mentions?.includes(state.user.id));
+  const forMe = mentions.some((found) => found.user_id === state.user.id || found.user_ids?.includes(state.user.id)) || Boolean(message.mentions?.includes(state.user.id));
   const node = el("article", { class: `message${message.user_id === state.user.id ? " own" : ""}${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
     grouped
       ? el("time", { class: "msg-time-gutter", datetime: message.created_at, text: shortTime(message.created_at) })
@@ -1187,7 +1187,11 @@ $("composer").addEventListener("submit", async (event) => {
   closeMentionPicker();
   const row = { workspace_id: state.workspace.id, channel_id: state.channel.id, body };
   if (state.replyTo) row.reply_to_id = state.replyTo.id;
-  const mentions = [...new Set(findMentions(body).map((found) => found.user_id))].filter((id) => id !== state.user.id);
+  const mentions = [...new Set(findMentions(body).flatMap((found) => found.user_ids || [found.user_id]))].filter((id) => id !== state.user.id);
+  if (mentions.length > 50) {
+    input.value = body;
+    return toast("This workspace has more than 50 people to notify. The existing mention limit is 50, so this tag can't reach everyone.");
+  }
   if (mentions.length) row.mentions = mentions; // they get a "mentioned you" notification
   let { data, error } = await supabase.from("hub_messages").insert(row).select().single();
   if (error && row.mentions && /mentions/.test(error.message)) {
@@ -1922,6 +1926,17 @@ function findMentions(text) {
   const found = [];
   if (!text.includes("@")) return found;
   let rest = text;
+  for (const match of text.matchAll(/@(admin|all)\b/giu)) {
+    const start = match.index;
+    if (start && /[\p{L}\p{N}_]/u.test(text[start - 1])) continue;
+    const kind = match[1].toLowerCase();
+    const user_ids = [...state.members.values()]
+      .filter((member) => kind === "all" || member.role === "admin")
+      .map((member) => member.user_id)
+      .filter((userId) => userId !== state.user.id);
+    found.push({ start, end: start + match[0].length, kind, user_ids });
+    rest = rest.slice(0, start) + " ".repeat(match[0].length) + rest.slice(start + match[0].length);
+  }
   const people = [...state.members.values()].sort((a, b) => b.display_name.length - a.display_name.length);
   for (const member of people) {
     const token = `@${member.display_name}`;
@@ -1938,7 +1953,8 @@ function bodyNode(text, mentions) {
   const parts = [];
   let last = 0;
   for (const mention of mentions) {
-    parts.push(text.slice(last, mention.start), el("span", { class: `mention${mention.user_id === state.user.id ? " is-me" : ""}`, text: text.slice(mention.start, mention.end) }));
+    const isForMe = mention.user_id === state.user.id || mention.user_ids?.includes(state.user.id);
+    parts.push(text.slice(last, mention.start), el("span", { class: `mention${isForMe ? " is-me" : ""}${mention.kind ? " is-group" : ""}`, text: text.slice(mention.start, mention.end) }));
     last = mention.end;
   }
   parts.push(text.slice(last));
@@ -1953,10 +1969,14 @@ function updateMentionPicker() {
   const before = input.value.slice(0, input.selectionStart ?? input.value.length);
   const match = before.match(/(?:^|\s)@([^\s@]{0,30})$/);
   const query = match ? match[1].toLowerCase() : null;
-  const items = query === null ? [] : [...state.members.values()]
+  const shortcuts = [
+    { kind: "admin", name: "admin", description: "Notify workspace admins" },
+    { kind: "all", name: "all", description: "Notify everyone in this workspace" },
+  ].filter((item) => item.name.includes(query || ""));
+  const people = query === null ? [] : [...state.members.values()]
     .filter((member) => member.user_id !== state.user.id && member.display_name.toLowerCase().includes(query))
     .sort((a, b) => Number(!a.display_name.toLowerCase().startsWith(query)) - Number(!b.display_name.toLowerCase().startsWith(query)) || a.display_name.localeCompare(b.display_name))
-    .slice(0, 6);
+  const items = query === null ? [] : [...shortcuts, ...people].slice(0, 6);
   Object.assign(mention, { items, query: match ? match[1] : "", active: query === mention.query.toLowerCase() ? Math.min(mention.active, Math.max(0, items.length - 1)) : 0 });
   renderMentionPicker();
 }
@@ -1970,13 +1990,16 @@ function renderMentionPicker() {
     type: "button",
     role: "option",
     "aria-selected": String(index === mention.active),
+    "aria-label": member.kind ? `@${member.name}: ${member.description}` : `Mention ${member.display_name}`,
     onpointerdown: (event) => event.preventDefault(), // keeps the keyboard open on phones
     onclick: () => pickMention(member),
-  }, avatarNode(member, "small"), member.display_name)));
+  }, member.kind
+    ? [el("span", { class: "mention-special-icon", "aria-hidden": "true", text: member.kind === "admin" ? "A" : "@" }), el("span", { class: "mention-option-copy" }, el("strong", { text: `@${member.name}` }), el("small", { text: member.description }))]
+    : [avatarNode(member, "small"), el("span", { text: member.display_name })])));
 }
 
 function pickMention(member) {
-  insertAtCaret(`@${member.display_name} `, mention.query.length + 1);
+  insertAtCaret(`@${member.name || member.display_name} `, mention.query.length + 1);
   closeMentionPicker();
 }
 

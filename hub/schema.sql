@@ -274,18 +274,18 @@ alter table public.hub_files enable row level security;
 alter table public.hub_messages enable row level security;
 
 create policy "hub: see yourself and workspace mates" on public.hub_profiles for select to authenticated
-  using (id = auth.uid() or public.hub_shares_workspace(id));
+  using (id = (select auth.uid()) or public.hub_shares_workspace(id));
 create policy "hub: create your own profile" on public.hub_profiles for insert to authenticated
-  with check (id = auth.uid());
+  with check (id = (select auth.uid()));
 create policy "hub: edit your own profile" on public.hub_profiles for update to authenticated
-  using (id = auth.uid()) with check (id = auth.uid());
+  using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
 create policy "hub: members see their workspaces" on public.hub_workspaces for select to authenticated
   using (public.hub_is_member(id));
 create policy "hub: admins rename workspaces" on public.hub_workspaces for update to authenticated
   using (public.hub_is_admin(id)) with check (public.hub_is_admin(id));
 create policy "hub: owners delete workspaces" on public.hub_workspaces for delete to authenticated
-  using (created_by = auth.uid());
+  using (created_by = (select auth.uid()));
 
 create policy "hub: members see each other" on public.hub_members for select to authenticated
   using (public.hub_is_member(workspace_id));
@@ -294,7 +294,7 @@ create policy "hub: admins change roles, never the owner's" on public.hub_member
     and user_id <> (select w.created_by from public.hub_workspaces w where w.id = hub_members.workspace_id))
   with check (public.hub_is_admin(workspace_id));
 create policy "hub: leave, or admins remove members (not the owner)" on public.hub_members for delete to authenticated
-  using ((user_id = auth.uid() or public.hub_is_admin(workspace_id))
+  using ((user_id = (select auth.uid()) or public.hub_is_admin(workspace_id))
     and user_id <> (select w.created_by from public.hub_workspaces w where w.id = hub_members.workspace_id));
 
 create policy "hub: members see the invite code" on public.hub_invites for select to authenticated
@@ -322,22 +322,22 @@ create policy "hub: admins delete channels" on public.hub_channels for delete to
 create policy "hub: members see files" on public.hub_files for select to authenticated
   using (public.hub_is_member(workspace_id));
 create policy "hub: members upload files" on public.hub_files for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_channels c where c.id = channel_id and c.workspace_id = hub_files.workspace_id)
     and split_part(path, '/', 1) = workspace_id::text and split_part(path, '/', 2) = channel_id::text);
 create policy "hub: members save summaries" on public.hub_files for update to authenticated
   using (public.hub_is_member(workspace_id)) with check (public.hub_is_member(workspace_id));
 create policy "hub: uploaders or admins delete files" on public.hub_files for delete to authenticated
-  using (user_id = auth.uid() or public.hub_is_admin(workspace_id));
+  using (user_id = (select auth.uid()) or public.hub_is_admin(workspace_id));
 
 create policy "hub: members read messages" on public.hub_messages for select to authenticated
   using (public.hub_is_member(workspace_id));
 create policy "hub: members send messages" on public.hub_messages for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_channels c where c.id = channel_id and c.workspace_id = hub_messages.workspace_id)
     and (file_id is null or exists (select 1 from public.hub_files f where f.id = file_id and f.channel_id = hub_messages.channel_id)));
 create policy "hub: senders or admins delete messages" on public.hub_messages for delete to authenticated
-  using (user_id = auth.uid() or public.hub_is_admin(workspace_id));
+  using (user_id = (select auth.uid()) or public.hub_is_admin(workspace_id));
 
 -- Spell out what signed-in users may do; the policies above narrow it to their own workspaces.
 -- Workspaces, memberships and invites are only created through the actions above.
@@ -371,7 +371,7 @@ create policy "hub: members read workspace files" on storage.objects for select 
 create policy "hub: members upload workspace files" on storage.objects for insert to authenticated
   with check (bucket_id = 'hub-files' and public.hub_is_member(((storage.foldername(name))[1])::uuid));
 create policy "hub: uploaders or admins remove workspace files" on storage.objects for delete to authenticated
-  using (bucket_id = 'hub-files' and (owner_id = auth.uid()::text
+  using (bucket_id = 'hub-files' and (owner_id = (select auth.uid())::text
     or public.hub_is_admin(((storage.foldername(name))[1])::uuid)));
 
 -- ---------- Member features: replies, reactions, stickers, memories, birthdays, notifications ----------
@@ -386,7 +386,7 @@ alter table public.hub_messages add constraint hub_messages_kind_check check (ki
 
 drop policy if exists "hub: members send messages" on public.hub_messages;
 create policy "hub: members send messages" on public.hub_messages for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_channels c where c.id = channel_id and c.workspace_id = hub_messages.workspace_id)
     and (file_id is null or exists (select 1 from public.hub_files f where f.id = file_id and f.channel_id = hub_messages.channel_id))
     and (reply_to_id is null or exists (select 1 from public.hub_messages r where r.id = hub_messages.reply_to_id and r.channel_id = hub_messages.channel_id)));
@@ -411,12 +411,12 @@ create policy "hub: members see reactions" on public.hub_reactions for select to
   using (public.hub_is_member(workspace_id));
 drop policy if exists "hub: members react" on public.hub_reactions;
 create policy "hub: members react" on public.hub_reactions for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_messages m where m.id = message_id
       and m.channel_id = hub_reactions.channel_id and m.workspace_id = hub_reactions.workspace_id));
 drop policy if exists "hub: remove your own reactions" on public.hub_reactions;
 create policy "hub: remove your own reactions" on public.hub_reactions for delete to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 
 revoke all on public.hub_reactions from anon, authenticated;
 grant select, insert, delete on public.hub_reactions to authenticated;
@@ -441,11 +441,11 @@ create policy "hub: members see memories" on public.hub_memories for select to a
   using (public.hub_is_member(workspace_id));
 drop policy if exists "hub: members add memories" on public.hub_memories;
 create policy "hub: members add memories" on public.hub_memories for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and split_part(path, '/', 1) = workspace_id::text and split_part(path, '/', 2) = 'memories');
 drop policy if exists "hub: uploaders or admins delete memories" on public.hub_memories;
 create policy "hub: uploaders or admins delete memories" on public.hub_memories for delete to authenticated
-  using (user_id = auth.uid() or public.hub_is_admin(workspace_id));
+  using (user_id = (select auth.uid()) or public.hub_is_admin(workspace_id));
 
 revoke all on public.hub_memories from anon, authenticated;
 grant select, insert, delete on public.hub_memories to authenticated;
@@ -496,17 +496,17 @@ alter table public.hub_notifications enable row level security;
 
 drop policy if exists "hub: see your notifications" on public.hub_notifications;
 create policy "hub: see your notifications" on public.hub_notifications for select to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 -- Message notifications come from the trigger below; the app only adds birthday reminders for you.
 drop policy if exists "hub: add your birthday reminders" on public.hub_notifications;
 create policy "hub: add your birthday reminders" on public.hub_notifications for insert to authenticated
-  with check (user_id = auth.uid() and kind = 'birthday' and public.hub_is_member(workspace_id));
+  with check (user_id = (select auth.uid()) and kind = 'birthday' and public.hub_is_member(workspace_id));
 drop policy if exists "hub: mark your notifications read" on public.hub_notifications;
 create policy "hub: mark your notifications read" on public.hub_notifications for update to authenticated
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 drop policy if exists "hub: clear your notifications" on public.hub_notifications;
 create policy "hub: clear your notifications" on public.hub_notifications for delete to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 
 revoke all on public.hub_notifications from anon, authenticated;
 grant select, insert, delete on public.hub_notifications to authenticated;
@@ -684,11 +684,11 @@ grant update (avatar_path) on public.hub_profiles to authenticated;
 -- a workspace with you can see it. Removing your own is already allowed, since you uploaded it.
 drop policy if exists "hub: see classmates' profile photos" on storage.objects;
 create policy "hub: see classmates' profile photos" on storage.objects for select to authenticated
-  using (bucket_id = 'hub-files' and ((storage.foldername(name))[1] = auth.uid()::text
+  using (bucket_id = 'hub-files' and ((storage.foldername(name))[1] = (select auth.uid())::text
     or public.hub_shares_workspace(((storage.foldername(name))[1])::uuid)));
 drop policy if exists "hub: add your own profile photo" on storage.objects;
 create policy "hub: add your own profile photo" on storage.objects for insert to authenticated
-  with check (bucket_id = 'hub-files' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'hub-files' and (storage.foldername(name))[1] = (select auth.uid())::text);
  then
     raise exception 'Invite codes must be 4 to 24 letters or numbers';
   end if;
@@ -742,18 +742,18 @@ alter table public.hub_files enable row level security;
 alter table public.hub_messages enable row level security;
 
 create policy "hub: see yourself and workspace mates" on public.hub_profiles for select to authenticated
-  using (id = auth.uid() or public.hub_shares_workspace(id));
+  using (id = (select auth.uid()) or public.hub_shares_workspace(id));
 create policy "hub: create your own profile" on public.hub_profiles for insert to authenticated
-  with check (id = auth.uid());
+  with check (id = (select auth.uid()));
 create policy "hub: edit your own profile" on public.hub_profiles for update to authenticated
-  using (id = auth.uid()) with check (id = auth.uid());
+  using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
 create policy "hub: members see their workspaces" on public.hub_workspaces for select to authenticated
   using (public.hub_is_member(id));
 create policy "hub: admins rename workspaces" on public.hub_workspaces for update to authenticated
   using (public.hub_is_admin(id)) with check (public.hub_is_admin(id));
 create policy "hub: owners delete workspaces" on public.hub_workspaces for delete to authenticated
-  using (created_by = auth.uid());
+  using (created_by = (select auth.uid()));
 
 create policy "hub: members see each other" on public.hub_members for select to authenticated
   using (public.hub_is_member(workspace_id));
@@ -762,7 +762,7 @@ create policy "hub: admins change roles, never the owner's" on public.hub_member
     and user_id <> (select w.created_by from public.hub_workspaces w where w.id = hub_members.workspace_id))
   with check (public.hub_is_admin(workspace_id));
 create policy "hub: leave, or admins remove members (not the owner)" on public.hub_members for delete to authenticated
-  using ((user_id = auth.uid() or public.hub_is_admin(workspace_id))
+  using ((user_id = (select auth.uid()) or public.hub_is_admin(workspace_id))
     and user_id <> (select w.created_by from public.hub_workspaces w where w.id = hub_members.workspace_id));
 
 create policy "hub: members see the invite code" on public.hub_invites for select to authenticated
@@ -790,22 +790,22 @@ create policy "hub: admins delete channels" on public.hub_channels for delete to
 create policy "hub: members see files" on public.hub_files for select to authenticated
   using (public.hub_is_member(workspace_id));
 create policy "hub: members upload files" on public.hub_files for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_channels c where c.id = channel_id and c.workspace_id = hub_files.workspace_id)
     and split_part(path, '/', 1) = workspace_id::text and split_part(path, '/', 2) = channel_id::text);
 create policy "hub: members save summaries" on public.hub_files for update to authenticated
   using (public.hub_is_member(workspace_id)) with check (public.hub_is_member(workspace_id));
 create policy "hub: uploaders or admins delete files" on public.hub_files for delete to authenticated
-  using (user_id = auth.uid() or public.hub_is_admin(workspace_id));
+  using (user_id = (select auth.uid()) or public.hub_is_admin(workspace_id));
 
 create policy "hub: members read messages" on public.hub_messages for select to authenticated
   using (public.hub_is_member(workspace_id));
 create policy "hub: members send messages" on public.hub_messages for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_channels c where c.id = channel_id and c.workspace_id = hub_messages.workspace_id)
     and (file_id is null or exists (select 1 from public.hub_files f where f.id = file_id and f.channel_id = hub_messages.channel_id)));
 create policy "hub: senders or admins delete messages" on public.hub_messages for delete to authenticated
-  using (user_id = auth.uid() or public.hub_is_admin(workspace_id));
+  using (user_id = (select auth.uid()) or public.hub_is_admin(workspace_id));
 
 -- Spell out what signed-in users may do; the policies above narrow it to their own workspaces.
 -- Workspaces, memberships and invites are only created through the actions above.
@@ -839,7 +839,7 @@ create policy "hub: members read workspace files" on storage.objects for select 
 create policy "hub: members upload workspace files" on storage.objects for insert to authenticated
   with check (bucket_id = 'hub-files' and public.hub_is_member(((storage.foldername(name))[1])::uuid));
 create policy "hub: uploaders or admins remove workspace files" on storage.objects for delete to authenticated
-  using (bucket_id = 'hub-files' and (owner_id = auth.uid()::text
+  using (bucket_id = 'hub-files' and (owner_id = (select auth.uid())::text
     or public.hub_is_admin(((storage.foldername(name))[1])::uuid)));
 
 -- ---------- Member features: replies, reactions, stickers, memories, birthdays, notifications ----------
@@ -854,7 +854,7 @@ alter table public.hub_messages add constraint hub_messages_kind_check check (ki
 
 drop policy if exists "hub: members send messages" on public.hub_messages;
 create policy "hub: members send messages" on public.hub_messages for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_channels c where c.id = channel_id and c.workspace_id = hub_messages.workspace_id)
     and (file_id is null or exists (select 1 from public.hub_files f where f.id = file_id and f.channel_id = hub_messages.channel_id))
     and (reply_to_id is null or exists (select 1 from public.hub_messages r where r.id = hub_messages.reply_to_id and r.channel_id = hub_messages.channel_id)));
@@ -879,12 +879,12 @@ create policy "hub: members see reactions" on public.hub_reactions for select to
   using (public.hub_is_member(workspace_id));
 drop policy if exists "hub: members react" on public.hub_reactions;
 create policy "hub: members react" on public.hub_reactions for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and exists (select 1 from public.hub_messages m where m.id = message_id
       and m.channel_id = hub_reactions.channel_id and m.workspace_id = hub_reactions.workspace_id));
 drop policy if exists "hub: remove your own reactions" on public.hub_reactions;
 create policy "hub: remove your own reactions" on public.hub_reactions for delete to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 
 revoke all on public.hub_reactions from anon, authenticated;
 grant select, insert, delete on public.hub_reactions to authenticated;
@@ -909,11 +909,11 @@ create policy "hub: members see memories" on public.hub_memories for select to a
   using (public.hub_is_member(workspace_id));
 drop policy if exists "hub: members add memories" on public.hub_memories;
 create policy "hub: members add memories" on public.hub_memories for insert to authenticated
-  with check (user_id = auth.uid() and public.hub_is_member(workspace_id)
+  with check (user_id = (select auth.uid()) and public.hub_is_member(workspace_id)
     and split_part(path, '/', 1) = workspace_id::text and split_part(path, '/', 2) = 'memories');
 drop policy if exists "hub: uploaders or admins delete memories" on public.hub_memories;
 create policy "hub: uploaders or admins delete memories" on public.hub_memories for delete to authenticated
-  using (user_id = auth.uid() or public.hub_is_admin(workspace_id));
+  using (user_id = (select auth.uid()) or public.hub_is_admin(workspace_id));
 
 revoke all on public.hub_memories from anon, authenticated;
 grant select, insert, delete on public.hub_memories to authenticated;
@@ -964,17 +964,17 @@ alter table public.hub_notifications enable row level security;
 
 drop policy if exists "hub: see your notifications" on public.hub_notifications;
 create policy "hub: see your notifications" on public.hub_notifications for select to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 -- Message notifications come from the trigger below; the app only adds birthday reminders for you.
 drop policy if exists "hub: add your birthday reminders" on public.hub_notifications;
 create policy "hub: add your birthday reminders" on public.hub_notifications for insert to authenticated
-  with check (user_id = auth.uid() and kind = 'birthday' and public.hub_is_member(workspace_id));
+  with check (user_id = (select auth.uid()) and kind = 'birthday' and public.hub_is_member(workspace_id));
 drop policy if exists "hub: mark your notifications read" on public.hub_notifications;
 create policy "hub: mark your notifications read" on public.hub_notifications for update to authenticated
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 drop policy if exists "hub: clear your notifications" on public.hub_notifications;
 create policy "hub: clear your notifications" on public.hub_notifications for delete to authenticated
-  using (user_id = auth.uid());
+  using (user_id = (select auth.uid()));
 
 revoke all on public.hub_notifications from anon, authenticated;
 grant select, insert, delete on public.hub_notifications to authenticated;
@@ -1152,11 +1152,11 @@ grant update (avatar_path) on public.hub_profiles to authenticated;
 -- a workspace with you can see it. Removing your own is already allowed, since you uploaded it.
 drop policy if exists "hub: see classmates' profile photos" on storage.objects;
 create policy "hub: see classmates' profile photos" on storage.objects for select to authenticated
-  using (bucket_id = 'hub-files' and ((storage.foldername(name))[1] = auth.uid()::text
+  using (bucket_id = 'hub-files' and ((storage.foldername(name))[1] = (select auth.uid())::text
     or public.hub_shares_workspace(((storage.foldername(name))[1])::uuid)));
 drop policy if exists "hub: add your own profile photo" on storage.objects;
 create policy "hub: add your own profile photo" on storage.objects for insert to authenticated
-  with check (bucket_id = 'hub-files' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'hub-files' and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 -- Index foreign-key columns not already covered by a leading index column.
 create index if not exists hub_channels_semester_id_fk_idx on public.hub_channels (semester_id);

@@ -504,3 +504,36 @@ body,.app{background-color:var(--sundust-ink)}
     transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,color .2s ease;
   }
 }
+
+
+/* Profile photo framing is a clear, first-class step in the profile editor */
+.photo-field{gap:8px}
+.photo-field>span{color:#f0e7dd;font-size:12px;font-weight:650}
+.photo-row{align-items:center;gap:12px}
+.photo-preview{width:86px;height:86px;border-radius:16px;border-color:#f2dfca30;background:#100d0c;box-shadow:0 0 0 4px #e2a45e0c}
+.photo-preview.round{border-radius:50%;border-color:#e2a45e6b;box-shadow:0 0 0 4px #e2a45e16,0 0 26px #d9773420}
+.photo-preview img{user-select:none;-webkit-user-drag:none}
+.photo-field-hint{max-width:430px;margin:0;color:#a99b8e;font-size:12px;line-height:1.55}
+.photo-choose{min-height:36px;padding-inline:14px;border-color:#e2a45e45;color:#f3d5ad}
+.photo-choose:hover{border-color:#e2a45e8a;background:#e2a45e13;color:#fff1df}
+.photo-crop-controls{
+  display:grid;gap:12px;width:min(100%,440px);max-width:440px;margin-top:4px;
+  padding:16px;border:1px solid #e2a45e43;border-radius:17px;
+  background:#17110e;box-shadow:inset 0 1px #fff8ef07,0 12px 32px #03020254;
+}
+.photo-crop-heading{display:grid;gap:2px;padding-bottom:10px;border-bottom:1px solid #f2dfca1d}
+.photo-crop-heading strong{color:#f5e8d8;font:600 19px/1.2 "Cormorant Garamond",Georgia,serif}
+.photo-crop-heading>span{color:#a99a8d;font-size:11px}
+.photo-crop-control{gap:4px 12px;color:#ded1c5;font-size:12px}
+.photo-crop-control>span{color:#e7bb83;font-size:11px;font-weight:600}
+.photo-crop-control input[type=range]{height:24px;margin:0;accent-color:#e2a45e;cursor:ew-resize}
+.photo-crop-control input[type=range]:focus-visible{outline:2px solid #e2a45e;outline-offset:3px}
+.photo-crop-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:9px;border-top:1px solid #f2dfca1d}
+.photo-crop-hint{max-width:245px;color:#a99a8d;font-size:11px;line-height:1.45}
+.photo-crop-reset{flex:0 0 auto;padding:7px 10px;border:1px solid #f2dfca25;border-radius:9px;background:#211914;color:#e9c99e;font:600 11px "DM Sans",sans-serif}
+.photo-crop-reset:hover{border-color:#e2a45e72;background:#302116;color:#fff0dd}
+@media(max-width:520px){
+  .photo-crop-controls{padding:13px}
+  .photo-crop-footer{align-items:flex-start;flex-direction:column}
+  .photo-crop-hint{max-width:none}
+}

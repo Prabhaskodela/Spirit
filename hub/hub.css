@@ -1304,3 +1304,18 @@ a,.link{color:#a7ddcb}
 .msg-menu-dots>span{display:block;width:3px;height:3px;border-radius:50%;background:currentColor}
 
 .msg-actions.is-floating{position:fixed;z-index:10000;max-width:min(94vw,520px);max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);overflow:auto;box-sizing:border-box;opacity:1;pointer-events:auto;visibility:visible}
+
+/* Single interactive profile photo crop box. */
+.photo-crop-heading{display:grid;gap:2px}
+.photo-crop-heading strong{color:#edf3f0;font-size:13px}
+.photo-crop-heading>span{color:#85938e;font-size:11px}
+.photo-crop-box{position:relative;width:min(100%,320px);aspect-ratio:1;overflow:hidden;border:1px solid #9ad9c455;border-radius:14px;background:#0c1213;touch-action:none;cursor:grab;user-select:none}
+.photo-crop-box:active{cursor:grabbing}
+.photo-crop-box:focus-visible{outline:2px solid #9ad9c4;outline-offset:3px}
+.photo-crop-box>img{position:absolute;max-width:none;pointer-events:none}
+.photo-crop-box::after{position:absolute;inset:7%;border:1px solid #ffffffc9;border-radius:50%;box-shadow:0 0 0 999px #05090a35;content:"";pointer-events:none}
+.photo-crop-empty{position:absolute;inset:0;display:grid;place-items:center;padding:20px;color:#85938e;font-size:12px;text-align:center}
+.photo-crop-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.photo-crop-reset{padding:5px 9px;border:1px solid #9ad9c433;border-radius:7px;background:#ffffff08;color:#b9ded1;font-size:11px}
+.photo-crop-reset:hover{background:#9ad9c414}
+@media(max-width:440px){.photo-crop-box{width:min(100%,280px)}.photo-crop-controls{max-width:100%}}

@@ -3,12 +3,13 @@
 Discord-style class spaces: **workspaces → semesters → subject channels**, with chat, PDF and screenshot sharing, invite links, and AI summaries made on each student's own laptop.
 
 - **Admins** create the workspace with its academic year, add semesters (Sem 1, Sem 2…) and subject channels with course codes, reset the invite, make other admins, and remove people.
-- **Every member** can copy the invite link or code, join more workspaces with **↗**, download a ZIP backup of everything, and see the 100 MB storage meter.
-- **In chat**, everyone can reply to a message, react with 👍 ❤️ 😂 🔥 🎉, add emoji, send one of six stickers, and share GIFs up to 5 MB. Each workspace has a **📷 Memories** photo gallery.
+- **Every member** can copy the invite link or code, join more workspaces with **↗**, and see the 100 MB storage meter. It turns amber at 80%, and admins get a **Free up space** link.
+- **In chat**, everyone can reply to a message, react with 👍 ❤️ 😂 🔥 🎉, add emoji, send one of six stickers, share GIFs up to 5 MB, and **@mention** classmates (type @ or tap the @ button); the people you mention get a notification. Each workspace has a **📷 Memories** photo gallery. Photos and screenshots over 1 MB are shrunk before upload.
 - **Notifications**: the 🔔 bell lists new messages from other channels and classmates' birthdays (only the day and month are stored). Browser pop-ups can be turned on while SpiritHUB is open.
 - **Ask AI**: each channel has an Ask AI tab for chatting with the model on your own laptop about that channel's files. Saved summaries are included automatically, and you can tap up to two files to have it read them in full. The chat is private and stays in your browser; **Share in #channel** posts an answer for everyone.
-- **Download chat**: the ⤓ button in a channel's header saves the whole conversation as a text file.
-- **Admin panel** (▾ → Admin panel, admins only): everything the workspace keeps in Supabase, including storage per channel, each channel's messages and files, each member's activity, and every file with Open and Delete, plus a full ZIP backup. Sign-in emails are never shown.
+- **Backup on every device**: each phone or laptop keeps a copy of the workspaces it opens (messages, files and Memories photos) in the browser, updated every few minutes while SpiritHUB is open. The line under the storage meter shows when it last updated; tap it for details. Signing out can also delete it, for shared computers.
+- **Phones**: the chat, tabs and message box are laid out for small screens.
+- **Admin panel** (▾ → Admin panel, admins only): everything the workspace keeps in Supabase, including storage per channel, each channel's messages and files, each member's activity, and every file with Open and Delete. **Free up space** moves older files off Supabase: they're saved on the admin's device first, stay on every device that backed them up, and keep their names and AI summaries in the chat. Sign-in emails are never shown.
 - **Everyone** signs in with email and password from any device, chats, uploads PDFs and images (up to 50 MB each), and can summarize any file with their local AI. Saved summaries show up for the whole channel.
 
 ## 1. Set up Supabase (once, free plan)
@@ -24,8 +25,10 @@ The tables are prefixed `hub_`, so this can share a Supabase project with the ma
 
 - `001-admin-options.sql`: academic year, course codes, invite codes every member can copy, and the 100 MB storage limit.
 - `002-member-features.sql`: replies, reactions and stickers in chat, the Memories gallery, birthdays, and notifications.
+- `003-fix-replies.sql`: lets replies to earlier messages send.
+- `004-free-up-space-and-mentions.sql`: Free up space, a guard that stops uploads before the project's 1 GB of file storage fills up, and @mention notifications.
 
-New projects don't need them, because `hub/schema.sql` already includes both.
+New projects don't need them, because `hub/schema.sql` already includes all of them.
 
 ## 2. Run it
 
@@ -52,7 +55,7 @@ The file goes from Supabase to your browser and to the model on your laptop. It 
 
 ## Free-plan limits
 
-500 MB database, 1 GB of file storage shared by every workspace, and 50 MB per file. Supabase pauses free projects after a week without activity; open the dashboard to wake it up.
+500 MB database, 1 GB of file storage shared by every workspace, and 50 MB per file. Uploads stop at 950 MB for the whole project, so it never gets stuck full; admins then free up space. Supabase pauses free projects after a week without activity; open the dashboard to wake it up.
 
 ## How access works
 

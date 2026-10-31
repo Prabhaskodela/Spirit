@@ -195,3 +195,38 @@ button.me-copy{padding:4px 6px;border:0;border-radius:8px;background:none;color:
   .composer{margin:0 10px 10px}
   .file-card{grid-template-columns:auto minmax(0,1fr)}.file-actions{grid-column:1/-1}
 }
+
+/* Storage warnings, the backup on this device, freeing up space and archived files */
+.storage.is-near #storage-label{color:var(--amber)}.storage.is-near #storage-fill{background:var(--amber)}.storage.is-full #storage-fill{background:var(--danger)}
+#free-space{justify-self:start;font-size:11px}
+.backup-status{justify-self:start;max-width:100%;padding:0;border:0;background:none;color:var(--subtle);font-size:11px;text-align:left;cursor:pointer}.backup-status:hover{color:var(--text)}.backup-status.is-problem{color:var(--amber)}
+.backup-info p{margin:0 0 10px}.backup-info p:last-child{margin:0}
+.file-card.is-archived{border-style:dashed;background:#13141a}.file-card.is-archived .file-icon{background:#ffffff0d;font-size:20px}
+.free-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px}
+.select{height:32px;padding:0 10px;border:1px solid #ffffff1c;border-radius:8px;background:#15161d;color:var(--text);font:inherit;font-size:13px}
+.check{display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:13px}.check input{margin-top:3px;accent-color:var(--pink)}
+
+/* @mentions */
+.mention{padding:0 3px;border-radius:5px;background:#b17fff26;color:#d9c2ff;font-weight:600}.mention.is-me{background:#ffbd6e2e;color:var(--amber)}
+.message.mentions-me{background:#ffbd6e0c;box-shadow:inset 2px 0 0 var(--amber)}.message.mentions-me:hover{background:#ffbd6e14}
+.mention-picker{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:16;display:grid;gap:2px;max-height:min(300px,45dvh);overflow-y:auto;padding:6px;border:1px solid #ffffff1c;border-radius:12px;background:#24232d;box-shadow:var(--shadow)}
+.mention-option{display:flex;align-items:center;gap:10px;min-height:40px;padding:5px 8px;border:0;border-radius:8px;background:none;color:var(--text);font:inherit;text-align:left}.mention-option:hover,.mention-option.is-active{background:#b17fff2a}
+#mention-button{font-size:15px}
+
+/* Phones: the tabs get their own row, the message box keeps room to type, and nothing zooms in or hides under the home bar */
+@media (max-width:760px){
+  .channel-header{flex-wrap:wrap;height:auto;row-gap:8px;padding:10px 8px 8px}
+  .channel-title{flex:1 1 0}
+  .tabs{order:5;flex:1 0 100%;margin:0}
+  .tab{flex:1;height:32px;white-space:nowrap}
+  .channel-intro{padding:20px 14px 6px}.intro-hash{width:48px;height:48px;font-size:22px}.channel-intro h3{font-size:20px;overflow-wrap:anywhere}
+  .message{padding-right:10px}
+  .msg-actions{right:6px}
+  .composer{gap:6px;margin:0 8px max(8px,env(safe-area-inset-bottom));padding:5px}
+  .composer label.tool{display:none} /* GIFs can still be sent with + */
+  .reply-bar{margin:0 8px 6px}
+}
+@media (hover:none) and (pointer:coarse){
+  #message-input,#ai-input,#dialog-input,.input,.select{font-size:16px} /* smaller text makes iPhones zoom in while typing */
+  .msg-actions button{min-width:32px;height:32px}
+}

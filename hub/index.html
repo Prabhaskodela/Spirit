@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101116">
   <meta name="description" content="SpiritHUB workspaces: semesters, subject channels, files and AI summaries for your class.">
   <title>SpiritHUB Workspaces</title>
@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="hub.css">
-  <script type="module" src="hub.js"></script>
+  <link rel="stylesheet" href="hub.css?v=20261031">
+  <script type="module" src="hub.js?v=20261031"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -71,7 +71,6 @@
             <button type="button" role="menuitem" data-ws="admin">Admin panel</button>
             <button type="button" role="menuitem" data-ws="semester">Add semester</button>
             <button type="button" role="menuitem" data-ws="channel">Add workspace channel</button>
-            <button type="button" role="menuitem" data-ws="backup">Download backup</button>
             <button type="button" role="menuitem" data-ws="leave" class="danger">Leave workspace</button>
             <button type="button" role="menuitem" data-ws="delete" class="danger">Delete workspace</button>
           </div>
@@ -80,6 +79,8 @@
         <div class="storage" id="storage" hidden>
           <span id="storage-label">Workspace files</span>
           <span class="storage-track" id="storage-meter" role="meter" aria-label="Workspace storage used" aria-valuemin="0" aria-valuemax="100"><span id="storage-fill"></span></span>
+          <button class="link small" id="free-space" type="button" hidden>Free up space</button>
+          <button class="backup-status" id="backup-status" type="button" title="About the backup on this device" hidden></button>
         </div>
         <footer class="me">
           <span class="avatar" id="me-avatar">S</span>
@@ -93,7 +94,7 @@
     <main class="main">
       <header class="channel-header">
         <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-label="Show workspaces and channels">☰</button>
-        <h2 class="channel-title"><span class="hash" id="channel-hash">#</span><span id="channel-name"></span></h2>
+        <h2 class="channel-title"><span class="hash" id="channel-hash">•</span><span id="channel-name"></span></h2>
         <span class="channel-sem" id="channel-sem"></span>
         <span class="channel-code" id="channel-code"></span>
         <div class="tabs" role="tablist">
@@ -101,7 +102,6 @@
           <button class="tab" type="button" role="tab" data-tab="files" aria-selected="false">Files <span class="count" id="file-count"></span></button>
           <button class="tab" type="button" role="tab" data-tab="ai" aria-selected="false">Ask AI</button>
         </div>
-        <button class="icon-btn" id="download-chat" type="button" title="Download this chat" aria-label="Download this chat" hidden>⤓</button>
         <button class="icon-btn bell" id="notifications-btn" type="button" title="Notifications" aria-label="Notifications" hidden><span aria-hidden="true">🔔</span><span class="unread" id="unread-count" hidden></span></button>
         <button class="icon-btn members-toggle" id="members-toggle" type="button" title="Members" aria-label="Show members">👥</button>
       </header>
@@ -112,12 +112,14 @@
         <form class="composer" id="composer">
           <label class="attach" title="Upload PDFs or images" aria-label="Upload PDFs or images"><input type="file" id="file-input" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" multiple hidden>＋</label>
           <label class="tool" title="Send a GIF (up to 5 MB)" aria-label="Send a GIF"><input type="file" id="gif-input" accept="image/gif" hidden>GIF</label>
-          <input id="message-input" autocomplete="off" maxlength="4000" placeholder="Message">
+          <input id="message-input" autocomplete="off" maxlength="4000" placeholder="Message" enterkeyhint="send" aria-autocomplete="list" aria-controls="mention-picker">
+          <button class="tool" id="mention-button" type="button" title="Mention someone" aria-label="Mention someone">@</button>
           <button class="tool" id="emoji-button" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">😊</button>
           <button class="tool" id="sticker-button" type="button" title="Stickers" aria-label="Stickers" aria-expanded="false">✦</button>
           <button class="send" type="submit" aria-label="Send">↗</button>
           <div class="picker" id="emoji-picker" hidden></div>
           <div class="picker sticker-picker" id="sticker-picker" hidden></div>
+          <div class="mention-picker" id="mention-picker" role="listbox" aria-label="People to mention" hidden></div>
         </form>
       </section>
 

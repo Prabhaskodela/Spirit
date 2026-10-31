@@ -718,7 +718,7 @@ function messageNode(message, grouped, reactions) {
   const replied = message.reply_to_id ? state.messages.find((candidate) => candidate.id === message.reply_to_id) : null;
   const mentions = message.body && message.kind !== "sticker" ? findMentions(message.body) : [];
   const forMe = mentions.some((found) => found.user_id === state.user.id) || Boolean(message.mentions?.includes(state.user.id));
-  const node = el("article", { class: `message${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
+  const node = el("article", { class: `message${message.user_id === state.user.id ? " own" : ""}${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
     grouped
       ? el("time", { class: "msg-time-gutter", datetime: message.created_at, text: shortTime(message.created_at) })
       : avatarNode(personOf(message.user_id)),

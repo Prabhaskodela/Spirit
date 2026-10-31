@@ -719,3 +719,27 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
   .modal{width:calc(100vw - 24px)}
 }
 
+/* Compact workspace switcher: name, context and chevron sit in one tidy control. */
+.ws-header{
+  flex:0 0 auto;height:auto;min-height:72px;display:flex;align-items:center;padding:9px 12px;
+}
+.ws-name{
+  width:100%;height:auto;min-height:52px;padding:7px 10px;gap:12px;
+  border:1px solid #68554b2b;border-radius:12px;background:#171210;
+  transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.ws-name:hover,.ws-name[aria-expanded="true"]{
+  border-color:#c0782865;background:#211914;box-shadow:inset 0 1px #fff6e908;
+}
+.ws-title{display:grid;gap:3px;min-width:0}
+.ws-title>span{color:#f0e8e8;font:600 15px/1.2 "Space Grotesk",sans-serif;letter-spacing:.005em}
+.ws-title small{color:#a99a8c;font:500 11px/1.25 "DM Sans",sans-serif;letter-spacing:0}
+.ws-title::after{display:none;content:none}
+.ws-name>span[aria-hidden="true"]{flex:0 0 auto;color:#d4a46c;font-size:15px;transition:transform .18s ease}
+.ws-name[aria-expanded="true"]>span[aria-hidden="true"]{transform:rotate(180deg)}
+@media(max-width:760px){
+  .ws-header{min-height:68px;padding:8px 10px}
+  .ws-name{min-height:50px;padding:6px 9px}
+  .ws-title>span{font-size:14px}
+}
+

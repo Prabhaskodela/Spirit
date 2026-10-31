@@ -1,19 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="SpiritHUB">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SpiritHUB app icon">
   <defs>
-    <linearGradient id="spirit-gradient" x1="22" y1="18" x2="105" y2="110" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ff6da8"/>
-      <stop offset=".54" stop-color="#b17fff"/>
+    <linearGradient id="spirit-gradient" x1="80" y1="100" x2="430" y2="390" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ff91b8"/>
+      <stop offset=".55" stop-color="#c58cff"/>
       <stop offset="1" stop-color="#a4f0d1"/>
     </linearGradient>
-    <radialGradient id="spirit-glow" cx="0" cy="0" r="1" gradientTransform="matrix(0 69 -69 0 63 56)" gradientUnits="userSpaceOnUse">
+    <radialGradient id="spirit-glow" cx="0" cy="0" r="1" gradientTransform="matrix(0 290 -290 0 256 210)" gradientUnits="userSpaceOnUse">
       <stop stop-color="#b17fff" stop-opacity=".2"/>
       <stop offset="1" stop-color="#b17fff" stop-opacity="0"/>
     </radialGradient>
   </defs>
-  <rect width="128" height="128" rx="34" fill="#15151e"/>
-  <rect width="128" height="128" rx="34" fill="url(#spirit-glow)"/>
-  <path d="M99 34c-6-8-16-12-27-11-13 1-22 8-24 17-2 9 5 14 18 19 13 5 21 10 18 20-3 10-16 17-30 15-9-1-17-5-22-11" fill="none" stroke="url(#spirit-gradient)" stroke-linecap="round" stroke-width="9"/>
-  <path d="m84 23 3-7 3 7 7 3-7 3-3 7-3-7-7-3 7-3Zm23 0 3-7 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#d8d2e0"/>
-  <path d="M26 87c11-4 17-11 22-19" fill="none" stroke="url(#spirit-gradient)" stroke-linecap="round" stroke-width="5" opacity=".85"/>
+  <rect width="512" height="512" rx="120" fill="#15151e"/>
+  <rect width="512" height="512" rx="120" fill="url(#spirit-glow)"/>
+  <text x="256" y="292" text-anchor="middle" textLength="430" lengthAdjust="spacingAndGlyphs" font-family="Dancing Script, Segoe Script, Brush Script MT, cursive" font-size="150" font-weight="700" fill="url(#spirit-gradient)">Spırit</text>
+  <path d="m218 164 5.5 15.5 15.5 5.5-15.5 5.5-5.5 15.5-5.5-15.5-15.5-5.5 15.5-5.5 5.5-15.5Zm89 0 5.5 15.5 15.5 5.5-15.5 5.5-5.5 15.5-5.5-15.5-15.5-5.5 15.5-5.5 5.5-15.5Z" fill="#ddd8e5"/>
+  <rect x="191" y="352" width="130" height="48" rx="13" fill="#a4f0d111" stroke="#a4f0d166" stroke-width="2"/>
+  <text x="256" y="384" text-anchor="middle" font-family="Space Grotesk, Segoe UI, sans-serif" font-size="25" font-weight="700" letter-spacing="6" fill="#a4f0d1">HUB</text>
 </svg>
 

@@ -334,8 +334,7 @@ function showApp() {
   $("auth").hidden = true;
   $("app").hidden = false;
   $("me-name").textContent = state.profile.display_name;
-  $("me-avatar").textContent = initials(state.profile.display_name);
-  $("me-avatar").style.setProperty("--hue", hue(state.user.id));
+  renderMyAvatar();
   renderRail();
 }
 
@@ -352,6 +351,7 @@ function resetWorkspace() {
   Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], workspaceRealtime: null, aiPicked: new Set() });
   $("storage").hidden = true;
   $("backup-status").hidden = true;
+  $("chat-view").classList.remove("has-background");
   $("memories-view").hidden = true;
   $("admin-view").hidden = true;
   $("ai-view").hidden = true;
@@ -376,6 +376,7 @@ async function loadMembers() {
     display_name: row.profile?.display_name || "Member",
     birth_month: row.profile?.birth_month ?? null,
     birth_day: row.profile?.birth_day ?? null,
+    avatar_path: row.profile?.avatar_path ?? null,
   }]));
   state.role = state.members.get(state.user.id)?.role || null;
 }
@@ -387,6 +388,7 @@ async function openWorkspace(id) {
   state.workspace = workspace;
   closePanels();
   renderRail();
+  renderBackground();
   $("ws-name").textContent = workspace.name;
   $("channel-tree").replaceChildren(el("p", { class: "loading", text: "Loading…" }));
   try {
@@ -534,12 +536,12 @@ function upsertFile(row) {
 
 function renderRail() {
   $("rail-list").replaceChildren(...state.workspaces.map((workspace) => el("button", {
-    class: `rail-btn${workspace.id === state.workspace?.id ? " is-active" : ""}`,
+    class: `rail-btn${workspace.id === state.workspace?.id ? " is-active" : ""}${workspace.icon_path ? " has-photo" : ""}`,
     type: "button",
     title: workspace.name,
     "aria-label": workspace.name,
     onclick: () => openWorkspace(workspace.id),
-  }, initials(workspace.name))));
+  }, workspaceIcon(workspace))));
 }
 
 function rowActions(actions) {
@@ -718,7 +720,7 @@ function messageNode(message, grouped, reactions) {
   const node = el("article", { class: `message${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
     grouped
       ? el("time", { class: "msg-time-gutter", datetime: message.created_at, text: shortTime(message.created_at) })
-      : el("span", { class: "avatar", style: `--hue:${hue(message.user_id)}`, text: initials(name), "aria-hidden": "true" }),
+      : avatarNode(personOf(message.user_id)),
     el("div", { class: "msg-main" },
       message.reply_to_id
         ? el("button", { class: "quote", type: "button", title: "Show the original message", onclick: () => jumpTo(message.reply_to_id) }, "↪",
@@ -786,7 +788,7 @@ function renderMembers() {
   const ownerId = state.workspace.created_by;
   const people = [...state.members.values()].sort((a, b) => a.display_name.localeCompare(b.display_name));
   const row = (member) => el("div", { class: "member" },
-    el("span", { class: "avatar small", style: `--hue:${hue(member.user_id)}`, text: initials(member.display_name), "aria-hidden": "true" }),
+    avatarNode(member, "small"),
     el("span", { class: "member-name", text: `${member.display_name}${member.user_id === state.user.id ? " (you)" : ""}` }),
     isBirthday(member) ? el("span", { class: "birthday", title: "Birthday today", "aria-label": "Birthday today", text: "🎂" }) : null,
     member.user_id === ownerId ? el("span", { class: "badge", text: "owner" }) : null,
@@ -828,14 +830,32 @@ async function editWorkspace() {
   const workspace = state.workspace;
   const name = el("input", { class: "input", maxlength: 60, value: workspace.name, required: true });
   const year = el("input", { class: "input", maxlength: 40, value: workspace.academic_year || "", placeholder: "e.g. 2026–27" });
-  const body = el("div", { class: "dialog-fields" }, field("Workspace name", name), field("Academic year (optional)", year));
+  const icon = photoField("Workspace photo (shown in the left bar instead of its initials)", workspace.icon_path);
+  const background = photoField("Chat background (shows faintly behind every channel's chat)", workspace.background_path);
+  const body = el("div", { class: "dialog-fields" }, field("Workspace name", name), field("Academic year (optional)", year), icon.node, background.node);
   if (!(await ask({ title: "Workspace settings", body, okLabel: "Save" }))) return;
   const changes = { name: name.value.trim() || workspace.name, academic_year: year.value.trim() || null };
+  let photos;
+  try {
+    photos = await savePhotos(`${workspace.id}/workspace`, [
+      { key: "icon_path", picker: icon, kind: "icon", edge: 256, square: true },
+      { key: "background_path", picker: background, kind: "background", edge: 1600, square: false },
+    ]);
+  } catch (error) {
+    return toast(`Couldn't upload the photo: ${error.message}`);
+  }
+  Object.assign(changes, photos.values);
   const result = await supabase.from("hub_workspaces").update(changes).eq("id", workspace.id).select("id");
-  if (failed(result, "Only admins can change workspace settings.")) return;
+  if (result.error && /icon_path|background_path/.test(result.error.message)) {
+    removeUploads(photos.uploaded);
+    return toast("Workspace photos need update 005. Ask the Supabase project owner to run it.");
+  }
+  if (failed(result, "Only admins can change workspace settings.")) return removeUploads(photos.uploaded);
+  removeUploads(Object.keys(photos.values).map((key) => workspace[key]).filter(Boolean)); // the photos they replaced
   Object.assign(workspace, changes);
   renderRail();
   renderSidebar();
+  renderBackground();
   toast("Workspace settings saved");
 }
 
@@ -911,7 +931,8 @@ async function deleteWorkspace() {
   if (typed !== state.workspace.name) return toast("The name didn't match, so nothing was deleted.");
   // Files go first: once the workspace row is gone, nobody is its admin any more.
   const memoryRows = await fetchAll(() => supabase.from("hub_memories").select("path").eq("workspace_id", state.workspace.id)).catch(() => []);
-  await removePaths([...(await filePaths((query) => query.eq("workspace_id", state.workspace.id))), ...memoryRows.map((row) => row.path)]);
+  const photos = [state.workspace.icon_path, state.workspace.background_path].filter(Boolean);
+  await removePaths([...(await filePaths((query) => query.eq("workspace_id", state.workspace.id))), ...memoryRows.map((row) => row.path), ...photos]);
   const result = await supabase.from("hub_workspaces").delete().eq("id", state.workspace.id).select("id");
   if (failed(result, "Only the owner can delete this workspace.")) return;
   await afterWorkspaceGone();
@@ -1056,23 +1077,31 @@ $("composer").addEventListener("submit", async (event) => {
   addMessage(data);
 });
 
+// Redraws an image as a JPEG at most `edge` pixels on its longer side, optionally cropped to a centred square.
+async function resizeImage(file, edge, { square = false, fill = "#fff" } = {}) {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const [sx, sy, sw, sh] = square ? [(bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side] : [0, 0, bitmap.width, bitmap.height];
+  const scale = Math.min(1, edge / Math.max(sw, sh));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(sw * scale);
+  canvas.height = Math.round(sh * scale);
+  const context = canvas.getContext("2d");
+  context.fillStyle = fill; // transparent parts would otherwise turn black in a JPEG
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  if (!blob) throw new Error("this photo couldn't be read");
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, { type: "image/jpeg" });
+}
+
 // Returns a smaller JPEG for big photos and screenshots, or the file itself when shrinking wouldn't help.
 async function shrinkImage(file) {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size <= SHRINK_OVER) return file;
   try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_PHOTO_EDGE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const context = canvas.getContext("2d");
-    context.fillStyle = "#fff"; // transparent PNGs would otherwise turn black as JPEG
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-    if (!blob || blob.size > file.size * 0.8) return file;
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, { type: "image/jpeg" });
+    const smaller = await resizeImage(file, MAX_PHOTO_EDGE);
+    return smaller.size <= file.size * 0.8 ? smaller : file;
   } catch {
     return file;
   }
@@ -1393,28 +1422,166 @@ async function openBackup() {
   await ask({ title: "Backup on this device", body, okLabel: "Close", cancelLabel: null });
 }
 
+/* ---------- Photos: workspace photos, chat backgrounds and profile photos ---------- */
+
+const photoUrls = new Map(); // storage path → address of a photo that has loaded
+const photoLoads = new Map(); // storage path → the load in progress
+
+// Each photo downloads once per device; after that it comes from this device's backup.
+function loadPhoto(path) {
+  if (!photoLoads.has(path)) {
+    photoLoads.set(path, (async () => {
+      let blob = await backup.fileBlob(path).catch(() => null);
+      if (!blob) {
+        const { data, error } = await supabase.storage.from(BUCKET).download(path);
+        if (error) throw error;
+        blob = data;
+        backup.saveBlob("photos", path, blob).catch(() => {});
+      }
+      photoUrls.set(path, URL.createObjectURL(blob));
+      return photoUrls.get(path);
+    })().catch((error) => {
+      photoLoads.delete(path); // try again next time
+      throw error;
+    }));
+  }
+  return photoLoads.get(path);
+}
+
+const personOf = (userId) => state.members.get(userId) || { user_id: userId, display_name: nameOf(userId) };
+
+// A round profile photo, or initials on a colour when there's none (or until it loads).
+function avatarNode(person, size = "") {
+  const node = el("span", { class: `avatar${size ? ` ${size}` : ""}`, style: `--hue:${hue(person.user_id)}`, "aria-hidden": "true" });
+  const path = person.avatar_path;
+  if (path && photoUrls.has(path)) node.append(el("img", { src: photoUrls.get(path), alt: "" }));
+  else {
+    node.textContent = initials(person.display_name);
+    if (path) loadPhoto(path).then((url) => node.replaceChildren(el("img", { src: url, alt: "" }))).catch(() => {});
+  }
+  return node;
+}
+
+function renderMyAvatar() {
+  const node = avatarNode({ user_id: state.user.id, display_name: state.profile.display_name, avatar_path: state.profile.avatar_path });
+  node.id = "me-avatar";
+  $("me-avatar").replaceWith(node);
+}
+
+// A workspace's photo in the left bar, or its initials when it has none.
+function workspaceIcon(workspace) {
+  if (!workspace.icon_path) return initials(workspace.name);
+  const image = el("img", { class: "rail-photo", alt: "" });
+  if (photoUrls.has(workspace.icon_path)) image.src = photoUrls.get(workspace.icon_path);
+  else loadPhoto(workspace.icon_path).then((url) => { image.src = url; }).catch(() => image.replaceWith(initials(workspace.name)));
+  return image;
+}
+
+// The workspace's background shows faintly behind its chats.
+function renderBackground() {
+  const path = state.workspace?.background_path;
+  const view = $("chat-view");
+  view.classList.toggle("has-background", Boolean(path));
+  view.style.removeProperty("--chat-background");
+  if (!path) return;
+  loadPhoto(path).then((url) => {
+    if (state.workspace?.background_path === path) view.style.setProperty("--chat-background", `url("${url}")`);
+  }).catch(() => view.classList.remove("has-background"));
+}
+
+// A dialog row that shows the current photo and lets you choose another or remove it.
+function photoField(label, path, round = false) {
+  let picked = null;
+  let removed = false;
+  const preview = el("span", { class: `photo-preview${round ? " round" : ""}` });
+  const show = (url) => preview.replaceChildren(url ? el("img", { src: url, alt: "" }) : el("span", { text: "None" }));
+  show(null);
+  if (path) loadPhoto(path).then(show).catch(() => {});
+  const remove = el("button", { class: "link small danger", type: "button", hidden: !path }, "Remove");
+  const input = el("input", { type: "file", accept: MEMORY_TYPES.join(","), hidden: true });
+  input.addEventListener("change", () => {
+    const [file] = input.files;
+    input.value = "";
+    if (!file) return;
+    if (!MEMORY_TYPES.includes(file.type)) return toast("Pick a photo (PNG, JPEG, WebP or GIF)");
+    [picked, removed] = [file, false];
+    show(URL.createObjectURL(file));
+    remove.hidden = false;
+  });
+  remove.addEventListener("click", () => {
+    [picked, removed] = [null, true];
+    show(null);
+    remove.hidden = true;
+  });
+  return {
+    node: el("div", { class: "field" }, el("span", { text: label }),
+      el("div", { class: "photo-row" }, preview, el("label", { class: "btn small ghost" }, path ? "Change" : "Choose photo", input), remove)),
+    // null when nothing changed, { file } for a new photo, { file: null } to remove it
+    change: () => (picked ? { file: picked } : removed ? { file: null } : null),
+  };
+}
+
+async function uploadPhoto(folder, kind, file, edge, square) {
+  const photo = await resizeImage(file, edge, { square, fill: "#101116" });
+  const path = `${folder}/${kind}-${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, photo, { contentType: "image/jpeg" });
+  if (error) throw error;
+  backup.saveBlob("photos", path, photo).catch(() => {});
+  return path;
+}
+
+// Uploads the photos a dialog changed. Resolves to the new column values and the uploaded paths,
+// so a save that fails afterwards can remove them again.
+async function savePhotos(folder, pickers) {
+  const values = {};
+  const uploaded = [];
+  for (const { key, picker, kind, edge, square } of pickers) {
+    const change = picker.change();
+    if (!change) continue;
+    values[key] = change.file ? await uploadPhoto(folder, kind, change.file, edge, square) : null;
+    if (values[key]) uploaded.push(values[key]);
+  }
+  return { values, uploaded };
+}
+
+const removeUploads = (paths) => (paths.length ? supabase.storage.from(BUCKET).remove(paths).then(() => {}) : Promise.resolve());
+
 /* ---------- Profile ---------- */
 
 async function editProfile() {
   const profile = state.profile;
   const pad = (value) => String(value).padStart(2, "0");
+  const photo = photoField("Profile photo (classmates see it next to your messages)", profile.avatar_path, true);
   const name = el("input", { class: "input", maxlength: 40, value: profile.display_name, required: true });
   // The year is a placeholder (2000 has a 29 February); only the month and day are saved, like the original app.
   const birthday = el("input", { class: "input", type: "date", value: profile.birth_month ? `2000-${pad(profile.birth_month)}-${pad(profile.birth_day)}` : "" });
   const body = el("div", { class: "dialog-fields" },
+    photo.node,
     field("Display name (what your classmates see)", name),
     field("Birthday (optional, only the day and month are kept)", birthday));
   if (!(await ask({ title: "Your profile", body, okLabel: "Save" }))) return;
   const [, month, day] = birthday.value ? birthday.value.split("-").map(Number) : [];
   const changes = { display_name: name.value.trim() || profile.display_name };
   if (month || profile.birth_month) Object.assign(changes, { birth_month: month || null, birth_day: day || null });
+  let photos;
+  try {
+    photos = await savePhotos(state.user.id, [{ key: "avatar_path", picker: photo, kind: "avatar", edge: 256, square: true }]);
+  } catch (error) {
+    return toast(/security policy/i.test(error.message) ? "Profile photos need update 005. Ask the Supabase project owner to run it." : `Couldn't upload the photo: ${error.message}`);
+  }
+  Object.assign(changes, photos.values);
   const result = await supabase.from("hub_profiles").update(changes).eq("id", state.user.id).select("*");
-  if (failed(result, "Couldn't save your profile. Try again.")) return;
+  if (result.error && /avatar_path/.test(result.error.message)) {
+    removeUploads(photos.uploaded);
+    return toast("Profile photos need update 005. Ask the Supabase project owner to run it.");
+  }
+  if (failed(result, "Couldn't save your profile. Try again.")) return removeUploads(photos.uploaded);
+  if ("avatar_path" in changes && profile.avatar_path) removeUploads([profile.avatar_path]);
   state.profile = result.data[0];
   $("me-name").textContent = state.profile.display_name;
-  $("me-avatar").textContent = initials(state.profile.display_name);
+  renderMyAvatar();
   const me = state.members.get(state.user.id);
-  if (me) Object.assign(me, { display_name: state.profile.display_name, birth_month: state.profile.birth_month ?? null, birth_day: state.profile.birth_day ?? null });
+  if (me) Object.assign(me, { display_name: state.profile.display_name, birth_month: state.profile.birth_month ?? null, birth_day: state.profile.birth_day ?? null, avatar_path: state.profile.avatar_path ?? null });
   renderMembers();
   renderMessages();
   toast("Profile saved");
@@ -1536,7 +1703,7 @@ function renderMentionPicker() {
     "aria-selected": String(index === mention.active),
     onpointerdown: (event) => event.preventDefault(), // keeps the keyboard open on phones
     onclick: () => pickMention(member),
-  }, el("span", { class: "avatar small", style: `--hue:${hue(member.user_id)}`, text: initials(member.display_name), "aria-hidden": "true" }), member.display_name)));
+  }, avatarNode(member, "small"), member.display_name)));
 }
 
 function pickMention(member) {
@@ -2263,7 +2430,7 @@ function toggleMenu(open = $("ws-menu").hidden) {
   if (!open) return;
   const admin = state.role === "admin";
   const owner = state.workspace.created_by === state.user.id;
-  const hiddenFor = { invite: false, settings: !admin, admin: !admin, semester: !admin, channel: !admin, backup: false, leave: owner, delete: !owner };
+  const hiddenFor = { invite: false, settings: !admin, admin: !admin, semester: !admin, channel: !admin, leave: owner, delete: !owner };
   $("ws-menu").querySelectorAll("button").forEach((button) => { button.hidden = hiddenFor[button.dataset.ws]; });
 }
 

@@ -204,20 +204,42 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function public.hub_set_invite(ws uuid, invite_code text) returns text
-language plpgsql security definer set search_path = public as $
+language plpgsql security definer set search_path = public as $$
 declare
   normalized_code text := lower(btrim(invite_code));
 begin
   if not public.hub_is_admin(ws) then
     raise exception 'Only room admins can change the invite code';
   end if;
-  if normalized_code !~ '^[a-z0-9]{4,24}
+  if normalized_code !~ '^[a-z0-9]{4,24}$' then
+    raise exception 'Invite codes must be 4 to 24 letters or numbers';
+  end if;
+
+  update public.hub_invites as i
+  set code = normalized_code, updated_at = now()
+  where i.workspace_id = ws;
+  if not found then
+    raise exception 'This room does not have an invite code yet';
+  end if;
+  return normalized_code;
+exception
+  when unique_violation then
+    raise exception 'That invite code is already in use';
+end;
+$$;
+
+create or replace function public.hub_reset_invite(ws uuid) returns text
 language plpgsql security definer set search_path = public as $$
 declare
   new_code text := public.hub_new_code();
 begin
-  if not public.hub_is_admin(ws) then raise exception 'Only admins can reset the invite link'; end if;
+  if not public.hub_is_admin(ws) then
+    raise exception 'Only admins can reset the invite link';
+  end if;
   update public.hub_invites set code = new_code, updated_at = now() where workspace_id = ws;
+  if not found then
+    raise exception 'This room does not have an invite code yet';
+  end if;
   return new_code;
 end;
 $$;
@@ -230,6 +252,9 @@ revoke execute on function public.hub_create_workspace(text) from public, anon;
 revoke execute on function public.hub_join(text) from public, anon;
 revoke execute on function public.hub_reset_invite(uuid) from public, anon;
 revoke execute on function public.hub_set_invite(uuid, text) from public, anon;
+revoke execute on function public.hub_is_member(uuid) from public, anon;
+revoke execute on function public.hub_is_admin(uuid) from public, anon;
+revoke execute on function public.hub_shares_workspace(uuid) from public, anon;
 grant execute on function public.hub_is_member(uuid), public.hub_is_admin(uuid), public.hub_shares_workspace(uuid) to authenticated;
 grant execute on function public.hub_create_workspace(text) to authenticated;
 grant execute on function public.hub_join(text) to authenticated;
@@ -1132,3 +1157,19 @@ create policy "hub: see classmates' profile photos" on storage.objects for selec
 drop policy if exists "hub: add your own profile photo" on storage.objects;
 create policy "hub: add your own profile photo" on storage.objects for insert to authenticated
   with check (bucket_id = 'hub-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Index foreign-key columns not already covered by a leading index column.
+create index if not exists hub_channels_semester_id_fk_idx on public.hub_channels (semester_id);
+create index if not exists hub_files_summarized_by_fk_idx on public.hub_files (summarized_by);
+create index if not exists hub_files_user_id_fk_idx on public.hub_files (user_id);
+create index if not exists hub_files_workspace_id_fk_idx on public.hub_files (workspace_id);
+create index if not exists hub_memories_user_id_fk_idx on public.hub_memories (user_id);
+create index if not exists hub_messages_file_id_fk_idx on public.hub_messages (file_id);
+create index if not exists hub_messages_reply_to_id_fk_idx on public.hub_messages (reply_to_id);
+create index if not exists hub_messages_user_id_fk_idx on public.hub_messages (user_id);
+create index if not exists hub_messages_workspace_id_fk_idx on public.hub_messages (workspace_id);
+create index if not exists hub_notifications_channel_id_fk_idx on public.hub_notifications (channel_id);
+create index if not exists hub_notifications_workspace_id_fk_idx on public.hub_notifications (workspace_id);
+create index if not exists hub_reactions_user_id_fk_idx on public.hub_reactions (user_id);
+create index if not exists hub_reactions_workspace_id_fk_idx on public.hub_reactions (workspace_id);
+create index if not exists hub_workspaces_created_by_fk_idx on public.hub_workspaces (created_by);

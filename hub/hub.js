@@ -376,18 +376,28 @@ async function loadWorkspaces() {
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
-async function loadMembers() {
-  const { data, error } = await supabase.from("hub_members").select("user_id, role, profile:hub_profiles(*)").eq("workspace_id", state.workspace.id);
-  if (error) throw error;
-  state.members = new Map(data.map((row) => [row.user_id, {
-    user_id: row.user_id,
-    role: row.role,
-    display_name: row.profile?.display_name || "Member",
-    birth_month: row.profile?.birth_month ?? null,
-    birth_day: row.profile?.birth_day ?? null,
-    avatar_path: row.profile?.avatar_path ?? null,
-  }]));
-  state.role = state.members.get(state.user.id)?.role || null;
+let memberLoad = null;
+
+async function loadMembers(workspaceId = state.workspace?.id) {
+  if (!workspaceId) return;
+  if (memberLoad?.workspaceId === workspaceId) return memberLoad.promise;
+  const promise = (async () => {
+    const { data, error } = await supabase.from("hub_members").select("user_id, role, profile:hub_profiles(*)").eq("workspace_id", workspaceId);
+    if (error) throw error;
+    if (state.workspace?.id !== workspaceId) return;
+    state.members = new Map(data.map((row) => [row.user_id, {
+      user_id: row.user_id,
+      role: row.role,
+      display_name: row.profile?.display_name || "Member",
+      birth_month: row.profile?.birth_month ?? null,
+      birth_day: row.profile?.birth_day ?? null,
+      avatar_path: row.profile?.avatar_path ?? null,
+    }]));
+    state.role = state.members.get(state.user.id)?.role || null;
+  })();
+  memberLoad = { workspaceId, promise };
+  try { return await promise; }
+  finally { if (memberLoad?.promise === promise) memberLoad = null; }
 }
 
 async function openWorkspace(id) {
@@ -471,13 +481,22 @@ async function openChannel(id) {
 }
 
 // Uploads and archiving by anyone, in any channel, move the storage meter.
+let storageRefreshTimer = null;
+function scheduleStorageRefresh() {
+  clearTimeout(storageRefreshTimer);
+  storageRefreshTimer = setTimeout(() => {
+    storageRefreshTimer = null;
+    if (document.visibilityState === "visible") refreshStorage();
+  }, 250);
+}
+
 function subscribeWorkspace(workspaceId) {
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
   const filter = `workspace_id=eq.${workspaceId}`;
   state.workspaceRealtime = supabase
     .channel(`hub-workspace-${workspaceId}`)
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_files", filter }, () => refreshStorage())
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_files", filter }, ({ new: row }) => row.archived_at && refreshStorage())
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_files", filter }, scheduleStorageRefresh)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_files", filter }, ({ new: row }) => row.archived_at && scheduleStorageRefresh())
     .subscribe();
 }
 
@@ -495,23 +514,32 @@ function subscribe(channelId) {
     .subscribe();
 }
 
+let messageRenderFrame = 0;
+function scheduleMessageRender() {
+  if (messageRenderFrame) return;
+  messageRenderFrame = requestAnimationFrame(() => {
+    messageRenderFrame = 0;
+    renderMessages();
+  });
+}
+
 function dropMessage(id) {
   forgetLocally("messages", { id });
   if (!state.messages.some((message) => message.id === id)) return;
   state.messages = state.messages.filter((message) => message.id !== id);
-  renderMessages();
+  scheduleMessageRender();
 }
 
 function addReaction(row) {
   if (row.channel_id !== state.channel?.id || state.reactions.some((reaction) => reaction.id === row.id)) return;
   state.reactions.push(row);
-  renderMessages();
+  scheduleMessageRender();
 }
 
 function removeReaction(id) {
   const before = state.reactions.length;
   state.reactions = state.reactions.filter((reaction) => reaction.id !== id);
-  if (state.reactions.length !== before) renderMessages();
+  if (state.reactions.length !== before) scheduleMessageRender();
 }
 
 function addMessage(row) {
@@ -520,13 +548,15 @@ function addMessage(row) {
   state.messages.push(row);
   if (!state.members.has(row.user_id)) {
     // Someone new joined since the member list loaded.
-    loadMembers().then(() => {
+    const workspaceId = state.workspace?.id;
+    loadMembers(workspaceId).then(() => {
+      if (state.workspace?.id !== workspaceId) return;
       renderMembers();
       renderSidebar();
-      renderMessages();
+      scheduleMessageRender();
     }).catch(() => {});
   }
-  renderMessages();
+  scheduleMessageRender();
 }
 
 function upsertFile(row) {
@@ -536,7 +566,7 @@ function upsertFile(row) {
   const index = state.files.findIndex((file) => file.id === row.id);
   if (index >= 0) state.files[index] = row;
   else state.files.unshift(row);
-  renderMessages();
+  scheduleMessageRender();
   renderFiles();
   renderHeader();
 }
@@ -1529,7 +1559,7 @@ function photoField(label, path, round = false) {
   const preview = el("span", { class: `photo-preview${round ? " round" : ""}` });
   const cropControls = el("div", { class: "photo-crop-controls", hidden: true });
   const show = (url) => {
-    preview.replaceChildren(url ? el("img", { src: url, alt: "" }) : el("span", { text: "None" }));
+    preview.replaceChildren(url ? el("img", { src: url, alt: "Profile photo crop preview" }) : el("span", { text: "No photo selected" }));
     syncCropPreview();
   };
   function syncCropPreview() {
@@ -1538,7 +1568,7 @@ function photoField(label, path, round = false) {
     image.style.objectPosition = `${crop.x}% ${crop.y}%`;
     image.style.transform = `scale(${crop.zoom})`;
   }
-  if (path) loadPhoto(path).then(show).catch(() => {});
+  if (path) loadPhoto(path).then((url) => { if (!picked && !removed) show(url); }).catch(() => {});
   const remove = el("button", { class: "link small danger", type: "button", hidden: !path }, "Remove");
   const input = el("input", { type: "file", accept: MEMORY_TYPES.join(","), hidden: true });
   const zoom = el("input", { type: "range", min: "1", max: "2.5", step: "0.05", value: "1", "aria-label": "Photo zoom" });
@@ -1547,13 +1577,22 @@ function photoField(label, path, round = false) {
   const zoomValue = el("span", { text: "1×" });
   const horizontalValue = el("span", { text: "50%" });
   const verticalValue = el("span", { text: "50%" });
+  const resetCrop = () => {
+    crop.zoom = 1; crop.x = 50; crop.y = 50;
+    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50";
+    zoomValue.textContent = "1×"; horizontalValue.textContent = "50%"; verticalValue.textContent = "50%";
+    syncCropPreview();
+  };
   const setControl = (name, input, value) => el("label", { class: "photo-crop-control" },
     el("span", {}, el("span", { text: name }), value), input);
   cropControls.append(
+    el("div", { class: "photo-crop-heading" }, el("strong", { text: "Adjust your profile photo" }), el("span", { text: "Frame it before you save" })),
     setControl("Zoom", zoom, zoomValue),
-    setControl("Horizontal", horizontal, horizontalValue),
-    setControl("Vertical", vertical, verticalValue),
-    el("p", { class: "photo-crop-hint", text: "Adjust the framing before saving." }));
+    setControl("Horizontal position", horizontal, horizontalValue),
+    setControl("Vertical position", vertical, verticalValue),
+    el("div", { class: "photo-crop-footer" },
+      el("p", { class: "photo-crop-hint", text: "The circular preview shows how classmates will see it." }),
+      el("button", { class: "photo-crop-reset", type: "button", onclick: resetCrop }, "Reset crop")));
   zoom.addEventListener("input", () => {
     crop.zoom = Number(zoom.value);
     zoomValue.textContent = `${crop.zoom.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}×`;
@@ -1568,11 +1607,11 @@ function photoField(label, path, round = false) {
     if (!MEMORY_TYPES.includes(file.type)) return toast("Pick a photo (PNG, JPEG, WebP or GIF)");
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     [picked, removed] = [file, false];
-    crop.zoom = 1; crop.x = 50; crop.y = 50;
-    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50"; zoomValue.textContent = "1×"; horizontalValue.textContent = "50%"; verticalValue.textContent = "50%";
+    resetCrop();
     previewUrl = URL.createObjectURL(file);
     show(previewUrl);
     cropControls.hidden = !round;
+    if (choose.firstChild) choose.firstChild.textContent = round ? "Change profile photo" : "Change photo";
     remove.hidden = false;
   });
   remove.addEventListener("click", () => {
@@ -1581,14 +1620,18 @@ function photoField(label, path, round = false) {
     previewUrl = null;
     show(null);
     cropControls.hidden = true;
+    if (choose.firstChild) choose.firstChild.textContent = round ? "Choose profile photo" : "Choose photo";
     remove.hidden = true;
   });
+  const choose = el("label", { class: "btn small ghost photo-choose" }, round ? (path ? "Change profile photo" : "Choose profile photo") : (path ? "Change photo" : "Choose photo"), input);
+  const photoHint = el("p", { class: "photo-field-hint", text: round
+    ? "Choose a photo, then adjust the zoom and position before saving."
+    : "Choose an image to preview it before saving." });
   return {
     node: el("div", { class: `field photo-field${round ? " is-croppable" : ""}` },
       el("span", { text: label }),
-      el("div", { class: "photo-row" }, preview,
-        el("label", { class: "btn small ghost photo-choose" }, path ? "Change photo" : "Choose photo", input),
-        remove),
+      el("div", { class: "photo-row" }, preview, choose, remove),
+      round ? photoHint : null,
       cropControls),
     // A selected profile photo includes its framing controls for the final square crop.
     change: () => (picked ? { file: picked, crop: round ? { ...crop } : null } : removed ? { file: null } : null),

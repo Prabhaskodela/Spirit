@@ -1319,3 +1319,28 @@ a,.link{color:#a7ddcb}
 .photo-crop-reset{padding:5px 9px;border:1px solid #9ad9c433;border-radius:7px;background:#ffffff08;color:#b9ded1;font-size:11px}
 .photo-crop-reset:hover{background:#9ad9c414}
 @media(max-width:440px){.photo-crop-box{width:min(100%,280px)}.photo-crop-controls{max-width:100%}}
+
+
+/* Independent, cloud-backed Spirit AI room tab. */
+.spirit-ai-tab{color:#b9e8d3}
+.spirit-ai-free-label{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid #9ad9c433;border-radius:99px;background:#9ad9c40e;color:#a9e7cf;font-size:10px;font-weight:700;white-space:nowrap}
+.spirit-ai-disclosure{margin:0 16px 6px;padding:8px 10px;border:1px solid #9ad9c41c;border-radius:9px;background:#9ad9c408;color:#9ca9a2;font-size:11px;line-height:1.45}
+.spirit-ai-thread{min-height:120px}
+.spirit-ai-user{display:grid;gap:4px}
+.spirit-ai-attachment-name{color:#a9e7cf;font-size:11px;font-weight:600}
+.spirit-ai-composer-wrap{flex:0 0 auto}
+.spirit-ai-file-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 16px 6px;padding:5px 8px;border:1px solid #9ad9c42b;border-radius:8px;background:#9ad9c40a;color:#c8ded4;font-size:11px}
+.spirit-ai-form{min-width:0}
+.spirit-ai-attach{flex:0 0 34px}
+.spirit-ai-form>input[type=text],.spirit-ai-form>input:not([type]){flex:1;min-width:0}
+@media(max-width:760px){
+  .spirit-ai-disclosure{margin-inline:12px}
+  .spirit-ai-file-row{margin-inline:12px}
+  .spirit-ai-form{gap:5px}
+  .spirit-ai-attach{width:30px;flex-basis:30px}
+  .tabs{overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{min-width:0;gap:3px;padding-inline:3px;font-size:9px}
+  .tab-icon{width:13px;height:13px;flex-basis:13px}
+  .tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}

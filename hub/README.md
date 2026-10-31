@@ -7,7 +7,7 @@ Discord-style class spaces: **workspaces → semesters → subject channels**, w
 - **In chat**, everyone can reply to a message, react with 👍 ❤️ 😂 🔥 🎉, add emoji, send one of six stickers, share GIFs up to 5 MB, and **@mention** classmates (type @ or tap the @ button); the people you mention get a notification. Each workspace has a **📷 Memories** photo gallery. Photos and screenshots over 1 MB are shrunk before upload.
 - **Notifications**: the 🔔 bell lists new messages from other channels and classmates' birthdays (only the day and month are stored). Browser pop-ups can be turned on while SpiritHUB is open.
 - **Ask AI**: each channel has an Ask AI tab for chatting with the model on your own laptop about that channel's files. Saved summaries are included automatically, and you can tap up to two files to have it read them in full. The chat is private and stays in your browser; **Share in #channel** posts an answer for everyone.
-- **Spirit AI (online)**: a separate room assistant that answers questions and reads a PDF or screenshot you attach. It does not use Ollama, does not share the Local AI chat, and keeps its chat on your device. It uses Gemini’s free API tier; quota limits can pause it, and Google may use free-tier requests to improve its products.
+- **Spirit AI (online)**: a workspace assistant in the left navigation above Memories. It answers questions and reads a PDF or screenshot you attach. It does not use Ollama, does not share the Local AI chat, and keeps a separate chat for each workspace on your device. It uses Gemini’s free API tier; quota limits can pause it, and Google may use free-tier requests to improve its products.
 - **Backup on every device**: each phone or laptop keeps a copy of the workspaces it opens (messages, files and Memories photos) in the browser, updated every few minutes while SpiritHUB is open. The line under the storage meter shows when it last updated; tap it for details. Signing out can also delete it, for shared computers.
 - **Phones**: the chat, tabs and message box are laid out for small screens.
 - **Photos**: admins give each workspace a photo (shown in the left bar instead of its initials) and a chat background in **▾ → Workspace settings**. Everyone adds their own profile photo by clicking their name in the bottom corner; classmates see it next to their messages.
@@ -58,7 +58,7 @@ The file goes from Supabase to your browser and to the model on your laptop. It 
 
 ## 4. Spirit AI (online, free tier)
 
-Spirit AI is independent from Local AI (Ollama). It sends the signed-in user's question and optional PDF/image to a Supabase Edge Function, which checks room access and calls Gemini. Conversations are kept in that browser; uploads are sent for inference and are not saved as Spirit AI chat attachments.
+Spirit AI is independent from Local AI (Ollama). Open it from the workspace navigation, above Memories. Each workspace has its own Spirit AI chat. It sends the signed-in user's question and optional PDF/image to a Supabase Edge Function, which checks workspace membership and calls Gemini. Conversations are kept in that browser; uploads are sent for inference and are not saved as Spirit AI chat attachments.
 
 To enable it without a local model:
 
@@ -71,7 +71,7 @@ To enable it without a local model:
    supabase link --project-ref YOUR_SUPABASE_PROJECT_REF
    supabase functions deploy spirit-ai
    ```
-4. Spirit AI is available in each room's **Spirit AI** tab. It accepts one PDF, PNG, JPEG, or WebP attachment up to 4 MB with a question. If Gemini's free quota is exhausted or unavailable, it shows a limit/setup message and does not choose a paid model.
+4. Spirit AI is available from the workspace navigation above **Memories**, whether or not a chat room is selected. It accepts one PDF, PNG, JPEG, or WebP attachment up to 4 MB with a question. If Gemini's free quota is exhausted or unavailable, it shows a limit/setup message and does not choose a paid model.
 
 Supabase's Free plan currently includes 500,000 Edge Function calls monthly. Keep the Supabase project on the Free plan for the no-cost setup; usage caps can pause the feature. Google states that free-tier requests may be used to improve its products, so don't upload private or sensitive material.
 

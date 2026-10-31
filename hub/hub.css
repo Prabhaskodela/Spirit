@@ -1299,3 +1299,6 @@ a,.link{color:#a7ddcb}
 .message.own .msg-menu-trigger:hover,.message.own .msg-menu[open] .msg-menu-trigger{background:#ffffff12;color:var(--text)}
 .message.own .msg-actions{position:absolute;top:calc(100% + 6px);right:0}
 @media(max-width:640px){.message.own>.own-message-row>.msg-main{width:min(88%,620px)}}
+
+.msg-menu-dots{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.msg-menu-dots>span{display:block;width:3px;height:3px;border-radius:50%;background:currentColor}

@@ -22,9 +22,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="hub.css?v=20261031-27">
+  <link rel="stylesheet" href="hub.css?v=20261031-28">
   <link rel="stylesheet" href="premium.css?v=20261031-22">
-  <script type="module" src="hub.js?v=20261031-25"></script>
+  <script type="module" src="hub.js?v=20261031-26"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -125,6 +125,7 @@
 
       <section class="chat" id="chat-view">
         <div class="messages" id="messages"></div>
+        <div class="typing-indicator" id="typing-indicator" aria-live="polite" hidden></div>
         <div class="reply-bar" id="reply-bar" hidden><span id="reply-label"></span><button class="icon-btn" id="reply-cancel" type="button" aria-label="Cancel reply">×</button></div>
         <form class="composer" id="composer">
           <label class="attach" title="Upload PDFs or images" aria-label="Upload PDFs or images"><input type="file" id="file-input" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" multiple hidden>＋</label>

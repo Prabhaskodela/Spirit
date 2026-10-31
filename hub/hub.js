@@ -44,6 +44,11 @@ const state = {
   channels: [],
   members: new Map(),
   onlineMembers: new Set(),
+  presenceByMember: new Map(),
+  presenceMeta: { typing_channel_id: null, typing_until: 0, seen_channel_id: null, seen_at: null },
+  typingStopTimer: null,
+  presenceTrackTimer: null,
+  lastPresenceTrack: 0,
   channel: null,
   messages: [],
   files: [],
@@ -360,7 +365,9 @@ function unsubscribe() {
 function resetWorkspace() {
   unsubscribe();
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
-  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), onlineMembers: new Set(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
+  clearTimeout(state.typingStopTimer);
+  clearTimeout(state.presenceTrackTimer);
+  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), onlineMembers: new Set(), presenceByMember: new Map(), presenceMeta: { typing_channel_id: null, typing_until: 0, seen_channel_id: null, seen_at: null }, typingStopTimer: null, presenceTrackTimer: null, lastPresenceTrack: 0, channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
   $("me-online").hidden = true;
   $("storage").hidden = true;
   $("backup-status").hidden = true;
@@ -471,6 +478,11 @@ async function openChannel(id) {
   const unreadAtOpen = state.channelUnread.get(id);
   state.unreadMarker = unreadAtOpen?.messageId || null;
   Object.assign(state, { channel, messages: [], files: [], reactions: [], view: "channel", aiPicked: new Set() });
+  clearTimeout(state.typingStopTimer);
+  state.typingStopTimer = null;
+  state.presenceMeta.typing_channel_id = null;
+  state.presenceMeta.typing_until = 0;
+  trackPresence();
   clearReply();
   closePanels();
   const last = local.get(LAST_KEY) || {};
@@ -519,6 +531,7 @@ async function openChannel(id) {
   if (unreadMessageId && $("messages").querySelector(`[data-id="${unreadMessageId}"]`)) jumpTo(unreadMessageId);
   $("message-input").focus({ preventScroll: true });
   markChannelRead(id);
+  updateSeenPresence();
 }
 
 // Uploads and archiving by anyone, in any channel, move the storage meter.
@@ -542,15 +555,87 @@ function subscribeWorkspace(workspaceId) {
       if (state.workspace?.id !== workspaceId) return;
       const presence = channel.presenceState();
       state.onlineMembers = new Set(Object.values(presence).flatMap((entries) => entries.map((entry) => entry.user_id).filter(Boolean)));
+      state.presenceByMember = new Map();
+      for (const entries of Object.values(presence)) for (const entry of entries) {
+        if (!entry.user_id) continue;
+        const current = state.presenceByMember.get(entry.user_id) || {};
+        if (Number(entry.typing_until) > Number(current.typing_until || 0)) current.typing_until = entry.typing_until;
+        if (entry.typing_channel_id) current.typing_channel_id = entry.typing_channel_id;
+        if (entry.seen_channel_id && entry.seen_at && (!current.seen_at || Date.parse(entry.seen_at) > Date.parse(current.seen_at))) {
+          current.seen_channel_id = entry.seen_channel_id;
+          current.seen_at = entry.seen_at;
+        }
+        state.presenceByMember.set(entry.user_id, current);
+      }
       $("me-online").hidden = !state.onlineMembers.has(state.user.id);
       renderMembers();
+      renderTypingIndicator();
+      scheduleMessageRender();
     });
   state.workspaceRealtime = channel;
   channel.subscribe((status) => {
     if (status === "SUBSCRIBED" && state.workspace?.id === workspaceId) {
-      channel.track({ user_id: state.user.id }).catch(() => {});
+      trackPresence();
     }
   });
+}
+
+function trackPresence() {
+  if (!state.workspaceRealtime || !state.user) return;
+  const wait = 650 - (Date.now() - state.lastPresenceTrack);
+  if (wait > 0) {
+    clearTimeout(state.presenceTrackTimer);
+    state.presenceTrackTimer = setTimeout(() => trackPresence(), wait);
+    return;
+  }
+  clearTimeout(state.presenceTrackTimer);
+  state.presenceTrackTimer = null;
+  state.lastPresenceTrack = Date.now();
+  state.workspaceRealtime.track({ user_id: state.user.id, ...state.presenceMeta }).catch(() => {});
+}
+
+function updateTypingPresence() {
+  const input = $("message-input");
+  const typing = Boolean(state.channel && input?.value.trim());
+  state.presenceMeta.typing_channel_id = typing ? state.channel.id : null;
+  state.presenceMeta.typing_until = typing ? Date.now() + 2600 : 0;
+  trackPresence();
+  renderTypingIndicator();
+  clearTimeout(state.typingStopTimer);
+  if (typing) {
+    state.typingStopTimer = setTimeout(() => {
+      state.presenceMeta.typing_channel_id = null;
+      state.presenceMeta.typing_until = 0;
+      trackPresence();
+      renderTypingIndicator();
+    }, 2200);
+  }
+}
+
+function renderTypingIndicator() {
+  const node = $("typing-indicator");
+  if (!node) return;
+  const now = Date.now();
+  const typing = [...state.presenceByMember.entries()]
+    .filter(([userId, presence]) => userId !== state.user?.id && presence.typing_channel_id === state.channel?.id && Number(presence.typing_until) > now)
+    .map(([userId]) => nameOf(userId));
+  node.hidden = !typing.length || state.tab !== "chat";
+  node.textContent = !typing.length ? "" : typing.length === 1 ? `${typing[0]} is typing…` : typing.length === 2 ? `${typing[0]} and ${typing[1]} are typing…` : `${typing.length} people are typing…`;
+}
+
+function updateSeenPresence() {
+  if (!state.channel || document.visibilityState !== "visible" || !$("messages")) return;
+  const viewport = $("messages").getBoundingClientRect();
+  const visible = [...$("messages").querySelectorAll(".message[data-id]")]
+    .filter((node) => { const rect = node.getBoundingClientRect(); return rect.bottom > viewport.top && rect.top < viewport.bottom; })
+    .at(-1);
+  const message = visible && state.messages.find((item) => item.id === visible.dataset.id);
+  if (!message) return;
+  const seenAt = message.created_at;
+  if (state.presenceMeta.seen_channel_id === state.channel.id && state.presenceMeta.seen_at && state.presenceMeta.seen_at >= seenAt) return;
+  state.presenceMeta.seen_channel_id = state.channel.id;
+  state.presenceMeta.seen_at = seenAt;
+  trackPresence();
 }
 
 function subscribe(channelId) {
@@ -573,6 +658,7 @@ function scheduleMessageRender() {
   messageRenderFrame = requestAnimationFrame(() => {
     messageRenderFrame = 0;
     renderMessages();
+    updateSeenPresence();
   });
 }
 
@@ -708,6 +794,7 @@ function setTab(tab) {
   $("ai-view").hidden = tab !== "ai";
   if (tab === "ai") renderAiView();
   renderHeader();
+  renderTypingIndicator();
 }
 
 function showEmpty(kind) {
@@ -823,6 +910,13 @@ function showReactionDetails(message, emoji) {
   ask({ title: `${emoji} Reactions`, body, okLabel: "Done", cancelLabel: null });
 }
 
+function showSeenBy(names) {
+  const body = el("div", { class: "seen-list" },
+    el("p", { class: "muted small", text: "Live receipts from workspace members currently online who have reached this message." }),
+    ...names.map((name) => el("div", { class: "reaction-person" }, el("span", { class: "avatar small", text: initials(name) }), el("span", { text: name }))));
+  ask({ title: "Seen by", body, okLabel: "Done", cancelLabel: null });
+}
+
 function messageNode(message, grouped, reactions) {
   const name = nameOf(message.user_id);
   const file = message.file_id ? state.files.find((candidate) => candidate.id === message.file_id) : null;
@@ -830,6 +924,9 @@ function messageNode(message, grouped, reactions) {
   const replied = message.reply_to_id ? state.messages.find((candidate) => candidate.id === message.reply_to_id) : null;
   const mentions = message.body && message.kind !== "sticker" ? findMentions(message.body) : [];
   const forMe = mentions.some((found) => found.user_id === state.user.id || found.user_ids?.includes(state.user.id)) || Boolean(message.mentions?.includes(state.user.id));
+  const seenBy = message.user_id === state.user.id
+    ? [...state.presenceByMember.entries()].filter(([userId, presence]) => userId !== state.user.id && presence.seen_channel_id === message.channel_id && Date.parse(presence.seen_at) >= Date.parse(message.created_at)).map(([userId]) => nameOf(userId))
+    : [];
   const node = el("article", { class: `message${message.user_id === state.user.id ? " own" : ""}${grouped ? " grouped" : ""}${forMe ? " mentions-me" : ""}`, "data-id": message.id },
     grouped
       ? el("time", { class: "msg-time-gutter", datetime: message.created_at, text: shortTime(message.created_at) })
@@ -843,6 +940,7 @@ function messageNode(message, grouped, reactions) {
       forMe ? el("span", { class: "mention-label", text: "Mentioned you" }) : null,
       message.kind === "sticker" ? stickerNode(message.body) : message.body ? bodyNode(message.body, mentions) : null,
       file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploading…" }) : null,
+      seenBy.length ? el("button", { class: "message-seen", type: "button", title: `Seen by ${seenBy.join(", ")}`, "aria-label": `Seen by ${seenBy.length} ${seenBy.length === 1 ? "member" : "members"}`, onclick: () => showSeenBy(seenBy) }, seenBy.length === 1 ? `Seen by ${seenBy[0]}` : `Seen by ${seenBy.length} members`) : null,
       reactions?.length ? reactionsRow(message, reactions) : null),
     el("div", { class: "msg-actions" },
       el("button", { class: "text", type: "button", title: "Reply", onclick: () => setReply(message) }, "Reply"),
@@ -1185,6 +1283,7 @@ $("composer").addEventListener("submit", async (event) => {
   const body = input.value.trim();
   if (!body || !state.channel) return;
   input.value = "";
+  updateTypingPresence();
   closeMentionPicker();
   const row = { workspace_id: state.workspace.id, channel_id: state.channel.id, body };
   if (state.replyTo) row.reply_to_id = state.replyTo.id;
@@ -2170,6 +2269,7 @@ function scheduleChannelUnreadRefresh(workspaceId) {
 
 // Coming back to SpiritHUB counts as reading the channel that's open.
 function readOpenChannel() {
+  updateSeenPresence();
   if (state.unread && state.channel && document.visibilityState === "visible") markChannelRead(state.channel.id);
 }
 
@@ -2800,6 +2900,9 @@ document.addEventListener("visibilitychange", readOpenChannel);
 $("reply-cancel").addEventListener("click", clearReply);
 $("mention-button").addEventListener("click", startMention);
 $("message-input").addEventListener("input", updateMentionPicker);
+$("message-input").addEventListener("input", updateTypingPresence);
+$("messages").addEventListener("scroll", () => { updateSeenPresence(); }, { passive: true });
+setInterval(renderTypingIndicator, 700);
 $("message-input").addEventListener("click", updateMentionPicker);
 $("message-input").addEventListener("keydown", (event) => {
   if (!mention.items.length || event.isComposing) return;

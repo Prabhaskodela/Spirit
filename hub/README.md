@@ -32,8 +32,9 @@ The tables are prefixed `hub_`, so this can share a Supabase project with the ma
 - `005-photos.sql`: workspace photos, chat backgrounds and profile photos.
 - `006-custom-invite-codes.sql`: lets admins set a stable custom invite code.
 - `007-secure-helpers-and-index-foreign-keys.sql`: restricts membership helper functions to signed-in users and adds indexes for foreign keys.
+- `008-cache-auth-in-rls-policies.sql`: evaluates the signed-in user ID once per statement in row access policies.
 
-New projects don't need these updates: `hub/schema.sql` includes all seven.
+New projects don't need these updates: `hub/schema.sql` includes all eight.
 
 ## 2. Run it
 

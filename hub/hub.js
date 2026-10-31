@@ -45,7 +45,10 @@ const state = {
   members: new Map(),
   onlineMembers: new Set(),
   presenceByMember: new Map(),
-  presenceMeta: { typing_channel_id: null, typing_until: 0, seen_channel_id: null, seen_at: null },
+  presenceMeta: { seen_channel_id: null, seen_at: null },
+  typingByMember: new Map(),
+  isTyping: false,
+  lastTypingSignal: 0,
   typingStopTimer: null,
   presenceTrackTimer: null,
   lastPresenceTrack: 0,
@@ -363,11 +366,12 @@ function unsubscribe() {
 }
 
 function resetWorkspace() {
+  stopTyping();
   unsubscribe();
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
   clearTimeout(state.typingStopTimer);
   clearTimeout(state.presenceTrackTimer);
-  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), onlineMembers: new Set(), presenceByMember: new Map(), presenceMeta: { typing_channel_id: null, typing_until: 0, seen_channel_id: null, seen_at: null }, typingStopTimer: null, presenceTrackTimer: null, lastPresenceTrack: 0, channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
+  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), onlineMembers: new Set(), presenceByMember: new Map(), presenceMeta: { seen_channel_id: null, seen_at: null }, typingByMember: new Map(), isTyping: false, lastTypingSignal: 0, typingStopTimer: null, presenceTrackTimer: null, lastPresenceTrack: 0, channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], channelUnread: new Map(), unreadMarker: null, workspaceRealtime: null, aiPicked: new Set() });
   $("me-online").hidden = true;
   $("storage").hidden = true;
   $("backup-status").hidden = true;
@@ -474,15 +478,11 @@ async function openWorkspace(id) {
 async function openChannel(id) {
   const channel = state.channels.find((candidate) => candidate.id === id);
   if (!channel) return;
+  stopTyping();
   unsubscribe();
   const unreadAtOpen = state.channelUnread.get(id);
   state.unreadMarker = unreadAtOpen?.messageId || null;
   Object.assign(state, { channel, messages: [], files: [], reactions: [], view: "channel", aiPicked: new Set() });
-  clearTimeout(state.typingStopTimer);
-  state.typingStopTimer = null;
-  state.presenceMeta.typing_channel_id = null;
-  state.presenceMeta.typing_until = 0;
-  trackPresence();
   clearReply();
   closePanels();
   const last = local.get(LAST_KEY) || {};
@@ -548,9 +548,15 @@ function subscribeWorkspace(workspaceId) {
   if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
   const filter = `workspace_id=eq.${workspaceId}`;
   const channel = supabase
-    .channel(`hub-workspace-${workspaceId}`, { config: { presence: { key: state.user.id } } })
+    .channel(`hub-workspace-${workspaceId}`, { config: { presence: { key: state.user.id }, broadcast: { self: false, ack: true } } })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_files", filter }, scheduleStorageRefresh)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_files", filter }, ({ new: row }) => row.archived_at && scheduleStorageRefresh())
+    .on("broadcast", { event: "typing" }, ({ payload }) => {
+      if (state.workspace?.id !== workspaceId || !payload?.user_id || payload.user_id === state.user?.id) return;
+      if (payload.typing && payload.channel_id) state.typingByMember.set(payload.user_id, { channel_id: payload.channel_id, expires_at: Date.now() + 2400 });
+      else state.typingByMember.delete(payload.user_id);
+      renderTypingIndicator();
+    })
     .on("presence", { event: "sync" }, () => {
       if (state.workspace?.id !== workspaceId) return;
       const presence = channel.presenceState();
@@ -597,27 +603,35 @@ function trackPresence() {
 function updateTypingPresence() {
   const input = $("message-input");
   const typing = Boolean(state.channel && input?.value.trim());
-  state.presenceMeta.typing_channel_id = typing ? state.channel.id : null;
-  state.presenceMeta.typing_until = typing ? Date.now() + 2600 : 0;
-  trackPresence();
+  if (!typing) return stopTyping();
+  const now = Date.now();
+  if (!state.isTyping || now - state.lastTypingSignal > 700) {
+    state.isTyping = true;
+    state.lastTypingSignal = now;
+    state.workspaceRealtime?.send({ type: "broadcast", event: "typing", payload: { user_id: state.user.id, channel_id: state.channel.id, typing: true } }).catch(() => {});
+  }
   renderTypingIndicator();
   clearTimeout(state.typingStopTimer);
-  if (typing) {
-    state.typingStopTimer = setTimeout(() => {
-      state.presenceMeta.typing_channel_id = null;
-      state.presenceMeta.typing_until = 0;
-      trackPresence();
-      renderTypingIndicator();
-    }, 2200);
-  }
+  state.typingStopTimer = setTimeout(stopTyping, 1800);
+}
+
+function stopTyping() {
+  clearTimeout(state.typingStopTimer);
+  state.typingStopTimer = null;
+  if (!state.isTyping) return;
+  state.isTyping = false;
+  const channelId = state.channel?.id;
+  if (channelId) state.workspaceRealtime?.send({ type: "broadcast", event: "typing", payload: { user_id: state.user.id, channel_id: channelId, typing: false } }).catch(() => {});
+  renderTypingIndicator();
 }
 
 function renderTypingIndicator() {
   const node = $("typing-indicator");
   if (!node) return;
   const now = Date.now();
-  const typing = [...state.presenceByMember.entries()]
-    .filter(([userId, presence]) => userId !== state.user?.id && presence.typing_channel_id === state.channel?.id && Number(presence.typing_until) > now)
+  for (const [userId, presence] of state.typingByMember) if (presence.expires_at <= now) state.typingByMember.delete(userId);
+  const typing = [...state.typingByMember.entries()]
+    .filter(([userId, presence]) => userId !== state.user?.id && presence.channel_id === state.channel?.id && presence.expires_at > now)
     .map(([userId]) => nameOf(userId));
   node.hidden = !typing.length || state.tab !== "chat";
   node.textContent = !typing.length ? "" : typing.length === 1 ? `${typing[0]} is typing…` : typing.length === 2 ? `${typing[0]} and ${typing[1]} are typing…` : `${typing.length} people are typing…`;

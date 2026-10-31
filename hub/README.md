@@ -6,6 +6,9 @@ Discord-style class spaces: **workspaces → semesters → subject channels**, w
 - **Every member** can copy the invite link or code, join more workspaces with **↗**, download a ZIP backup of everything, and see the 100 MB storage meter.
 - **In chat**, everyone can reply to a message, react with 👍 ❤️ 😂 🔥 🎉, add emoji, send one of six stickers, and share GIFs up to 5 MB. Each workspace has a **📷 Memories** photo gallery.
 - **Notifications**: the 🔔 bell lists new messages from other channels and classmates' birthdays (only the day and month are stored). Browser pop-ups can be turned on while SpiritHUB is open.
+- **Ask AI**: each channel has an Ask AI tab for chatting with the model on your own laptop about that channel's files. Saved summaries are included automatically, and you can tap up to two files to have it read them in full. The chat is private and stays in your browser; **Share in #channel** posts an answer for everyone.
+- **Download chat**: the ⤓ button in a channel's header saves the whole conversation as a text file.
+- **Admin panel** (▾ → Admin panel, admins only): everything the workspace keeps in Supabase, including storage per channel, each channel's messages and files, each member's activity, and every file with Open and Delete, plus a full ZIP backup. Sign-in emails are never shown.
 - **Everyone** signs in with email and password from any device, chats, uploads PDFs and images (up to 50 MB each), and can summarize any file with their local AI. Saved summaries show up for the whole channel.
 
 ## 1. Set up Supabase (once, free plan)

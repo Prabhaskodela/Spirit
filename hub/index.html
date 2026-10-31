@@ -68,6 +68,7 @@
           <div class="ws-menu" id="ws-menu" role="menu" hidden>
             <button type="button" role="menuitem" data-ws="invite">Invite people</button>
             <button type="button" role="menuitem" data-ws="settings">Workspace settings</button>
+            <button type="button" role="menuitem" data-ws="admin">Admin panel</button>
             <button type="button" role="menuitem" data-ws="semester">Add semester</button>
             <button type="button" role="menuitem" data-ws="channel">Add workspace channel</button>
             <button type="button" role="menuitem" data-ws="backup">Download backup</button>
@@ -98,7 +99,9 @@
         <div class="tabs" role="tablist">
           <button class="tab is-active" type="button" role="tab" data-tab="chat" aria-selected="true">Chat</button>
           <button class="tab" type="button" role="tab" data-tab="files" aria-selected="false">Files <span class="count" id="file-count"></span></button>
+          <button class="tab" type="button" role="tab" data-tab="ai" aria-selected="false">Ask AI</button>
         </div>
+        <button class="icon-btn" id="download-chat" type="button" title="Download this chat" aria-label="Download this chat" hidden>⤓</button>
         <button class="icon-btn bell" id="notifications-btn" type="button" title="Notifications" aria-label="Notifications" hidden><span aria-hidden="true">🔔</span><span class="unread" id="unread-count" hidden></span></button>
         <button class="icon-btn members-toggle" id="members-toggle" type="button" title="Members" aria-label="Show members">👥</button>
       </header>
@@ -120,7 +123,11 @@
 
       <section class="files" id="files-view" hidden></section>
 
+      <section class="ai-view" id="ai-view" hidden></section>
+
       <section class="memories" id="memories-view" hidden></section>
+
+      <section class="admin" id="admin-view" hidden></section>
 
       <section class="empty-main" id="empty-main" hidden>
         <div class="empty-glyph">✳</div>

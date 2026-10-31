@@ -1,7 +1,7 @@
 // SpiritHUB workspaces: Discord-style class spaces (workspace → semesters → subject channels) on Supabase.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { AI_DEFAULTS, aiSettings, checkAi, markdown, summarizeFile } from "./ai.js";
+import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 
 const BUCKET = "hub-files";
 const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -49,12 +49,17 @@ const state = {
   signedUrls: new Map(),
   openSummaries: new Set(),
   storageUsed: 0,
-  view: "channel", // or "memories"
+  view: "channel", // or "memories" or "admin"
   replyTo: null,
   reactions: [],
   memories: [],
   unread: 0,
   notifications: null,
+  workspaceRealtime: null,
+  aiPicked: new Set(), // files the Ask AI chat reads in full
+  aiFileCache: new Map(),
+  aiThreads: new Map(),
+  aiBusy: false,
 };
 
 const storage = (area) => ({
@@ -337,9 +342,12 @@ function unsubscribe() {
 
 function resetWorkspace() {
   unsubscribe();
-  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [] });
+  if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
+  Object.assign(state, { workspace: null, role: null, semesters: [], channels: [], members: new Map(), channel: null, messages: [], files: [], storageUsed: 0, view: "channel", reactions: [], memories: [], workspaceRealtime: null, aiPicked: new Set() });
   $("storage").hidden = true;
   $("memories-view").hidden = true;
+  $("admin-view").hidden = true;
+  $("ai-view").hidden = true;
   clearReply();
 }
 
@@ -394,6 +402,7 @@ async function openWorkspace(id) {
   renderSidebar();
   renderMembers();
   refreshStorage();
+  subscribeWorkspace(id);
   const channel = state.channels.find((candidate) => candidate.id === last.channels?.[id]) || orderedChannels()[0];
   if (channel) await openChannel(channel.id);
   else showEmpty("channel");
@@ -403,13 +412,15 @@ async function openChannel(id) {
   const channel = state.channels.find((candidate) => candidate.id === id);
   if (!channel) return;
   unsubscribe();
-  Object.assign(state, { channel, messages: [], files: [], reactions: [], view: "channel" });
+  Object.assign(state, { channel, messages: [], files: [], reactions: [], view: "channel", aiPicked: new Set() });
   clearReply();
   closePanels();
   const last = local.get(LAST_KEY) || {};
   local.set(LAST_KEY, { ...last, workspace: state.workspace.id, channels: { ...(last.channels || {}), [state.workspace.id]: id } });
   $("empty-main").hidden = true;
   $("memories-view").hidden = true;
+  $("admin-view").hidden = true;
+  refreshStorage();
   setTab(state.tab);
   renderSidebar();
   $("messages").replaceChildren(el("p", { class: "loading", text: "Loading messages…" }));
@@ -434,8 +445,18 @@ async function openChannel(id) {
   subscribe(id);
   renderMessages(true);
   renderFiles();
+  if (state.tab === "ai") renderAiView();
   renderHeader();
   markChannelRead(id);
+}
+
+// Uploads by anyone, in any channel, move the storage meter.
+function subscribeWorkspace(workspaceId) {
+  if (state.workspaceRealtime) supabase.removeChannel(state.workspaceRealtime);
+  state.workspaceRealtime = supabase
+    .channel(`hub-workspace-${workspaceId}`)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_files", filter: `workspace_id=eq.${workspaceId}` }, () => refreshStorage())
+    .subscribe();
 }
 
 function subscribe(channelId) {
@@ -543,11 +564,12 @@ function renderSidebar() {
 
 function renderHeader() {
   const channel = state.channel;
-  const memories = state.view === "memories" && Boolean(state.workspace);
-  document.querySelector(".channel-title").hidden = !channel && !memories;
+  const special = state.workspace && { memories: ["📷", "Memories"], admin: ["🛠", "Admin panel"] }[state.view];
+  document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
-  $("channel-hash").textContent = memories ? "📷" : "#";
-  $("channel-name").textContent = memories ? "Memories" : channel?.name || "";
+  $("download-chat").hidden = !channel;
+  $("channel-hash").textContent = special ? special[0] : "#";
+  $("channel-name").textContent = special ? special[1] : channel?.name || "";
   $("channel-sem").textContent = channel?.semester_id ? state.semesters.find((semester) => semester.id === channel.semester_id)?.name || "" : "";
   $("channel-code").textContent = channel?.course_code || "";
   $("message-input").placeholder = channel ? `Message #${channel.name}` : "Message";
@@ -564,6 +586,8 @@ function setTab(tab) {
   state.tab = tab;
   $("chat-view").hidden = tab !== "chat";
   $("files-view").hidden = tab !== "files";
+  $("ai-view").hidden = tab !== "ai";
+  if (tab === "ai") renderAiView();
   renderHeader();
 }
 
@@ -572,7 +596,9 @@ function showEmpty(kind) {
   Object.assign(state, { channel: null, messages: [], files: [], reactions: [], view: "channel" });
   $("chat-view").hidden = true;
   $("files-view").hidden = true;
+  $("ai-view").hidden = true;
   $("memories-view").hidden = true;
+  $("admin-view").hidden = true;
   const admin = state.role === "admin";
   $("empty-main").hidden = false;
   $("empty-main").replaceChildren(
@@ -884,7 +910,7 @@ async function renameSemester(semester) {
 function afterChannelsChanged() {
   renderSidebar();
   refreshStorage();
-  if (state.view === "memories") return;
+  if (state.view !== "channel") return;
   if (state.channels.some((channel) => channel.id === state.channel?.id)) return;
   const next = orderedChannels()[0];
   if (next) openChannel(next.id);
@@ -1153,16 +1179,66 @@ async function downloadBackup() {
       if (error) throw new Error(`couldn't include ${item.label} (${error.message})`);
       archive[`${item.into}/${item.path.split("/").pop()}`] = new Uint8Array(await data.arrayBuffer());
     }
-    const url = URL.createObjectURL(new Blob([zipSync(archive, { level: 1 })], { type: "application/zip" }));
-    const link = el("a", { href: url, download: `${slug(workspace.name)}-spirithub-backup.zip` });
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    saveFile(`${slug(workspace.name)}-spirithub-backup.zip`, new Blob([zipSync(archive, { level: 1 })], { type: "application/zip" }));
     const count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
     toast(`Backup downloaded: ${count(messages.length, "message")}, ${count(files.length, "file")} and ${count(memories.length, "photo")}`);
   } catch (error) {
     toast(`Backup failed: ${error.message}`);
+  }
+}
+
+function saveFile(name, content, type = "text/plain;charset=utf-8") {
+  const url = URL.createObjectURL(content instanceof Blob ? content : new Blob([content], { type }));
+  const link = el("a", { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+const fullTime = (iso) => new Date(iso).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// A readable text copy of a channel's whole conversation.
+async function downloadChat(channel = state.channel) {
+  if (!channel) return;
+  toast(`Preparing #${channel.name}…`, 60000);
+  try {
+    const [messages, files, reactions] = await Promise.all([
+      fetchAll(() => supabase.from("hub_messages").select("*").eq("channel_id", channel.id).order("created_at")),
+      fetchAll(() => supabase.from("hub_files").select("id, name, size").eq("channel_id", channel.id)),
+      fetchAll(() => supabase.from("hub_reactions").select("message_id, emoji").eq("channel_id", channel.id)).catch(() => []),
+    ]);
+    const filesById = new Map(files.map((file) => [file.id, file]));
+    const messagesById = new Map(messages.map((message) => [message.id, message]));
+    const reactionsByMessage = new Map();
+    for (const { message_id: id, emoji } of reactions) {
+      const counts = reactionsByMessage.get(id) || new Map();
+      counts.set(emoji, (counts.get(emoji) || 0) + 1);
+      reactionsByMessage.set(id, counts);
+    }
+    const where = [state.semesters.find((semester) => semester.id === channel.semester_id)?.name, channel.course_code].filter(Boolean).join(" · ");
+    const count = `${messages.length} message${messages.length === 1 ? "" : "s"}`;
+    const lines = [
+      `SpiritHUB · ${state.workspace.name} · #${channel.name}${where ? ` (${where})` : ""}`,
+      `Downloaded ${fullTime(new Date().toISOString())} by ${state.profile.display_name} · ${count}`,
+      "",
+    ];
+    for (const message of messages) {
+      const file = message.file_id ? filesById.get(message.file_id) : null;
+      const replied = message.reply_to_id ? messagesById.get(message.reply_to_id) : null;
+      const content = [
+        message.kind === "sticker" ? `[sticker] ${message.body}` : message.body,
+        file ? `[file] ${file.name} (${formatSize(file.size)})` : message.file_id ? "[file removed]" : "",
+      ].filter(Boolean).join(" ");
+      const reply = replied ? ` (replying to ${nameOf(replied.user_id)}: "${(replied.body || "a file").replace(/\s+/g, " ").slice(0, 60)}")` : "";
+      lines.push(`[${fullTime(message.created_at)}] ${nameOf(message.user_id)}${reply}: ${content.replace(/\n/g, "\n    ")}`);
+      const counts = reactionsByMessage.get(message.id);
+      if (counts) lines.push(`    reactions: ${[...counts].map(([emoji, n]) => `${emoji} ${n}`).join("  ")}`);
+    }
+    saveFile(`${slug(state.workspace.name)}-${channel.name}.txt`, `${lines.join("\n")}\n`);
+    toast(`Downloaded #${channel.name}: ${count}`);
+  } catch (error) {
+    toast(`Couldn't download the chat: ${error.message}`);
   }
 }
 
@@ -1266,9 +1342,12 @@ async function openMemories() {
   $("empty-main").hidden = true;
   $("chat-view").hidden = true;
   $("files-view").hidden = true;
+  $("ai-view").hidden = true;
+  $("admin-view").hidden = true;
   $("memories-view").hidden = false;
   renderSidebar();
   renderHeader();
+  refreshStorage(); // photos others added don't arrive live
   $("memories-view").replaceChildren(el("p", { class: "loading", text: "Loading memories…" }));
   const workspaceId = state.workspace.id;
   const { data, error } = await supabase.from("hub_memories").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false });
@@ -1454,6 +1533,291 @@ async function checkBirthdays() {
   refreshUnread();
 }
 
+/* ---------- Ask AI: chat with the model on your laptop about a channel's files ---------- */
+
+const ASK_SYSTEM = "You are SpiritHUB's study assistant for Kalvium students, running on the student's own laptop. Answer directly and concisely in Markdown, with no title or preamble. Use the channel's files when they are relevant. You also help with coding: explain code, find bugs, and give small, correct fixes.";
+const MAX_PICKED = 2; // a small model can only read so much at once
+const aiKey = (channelId) => `spirithub-hub:ai-chat:${state.user.id}:${channelId}`;
+
+// Each channel keeps its own private conversation, saved in this browser only.
+function threadFor(channelId) {
+  if (!state.aiThreads.has(channelId)) state.aiThreads.set(channelId, local.get(aiKey(channelId)) || []);
+  return state.aiThreads.get(channelId);
+}
+
+function fileChip(file) {
+  const chip = el("button", { class: "file-chip", type: "button" }, file.mime.startsWith("image/") ? "🖼 " : "📄 ", file.name);
+  const paint = () => {
+    const picked = state.aiPicked.has(file.id);
+    chip.classList.toggle("is-picked", picked);
+    chip.setAttribute("aria-pressed", String(picked));
+    chip.title = picked ? "The AI reads this whole file" : file.summary ? "The AI uses its saved summary. Tap to have it read the whole file" : "Tap to have the AI read this file";
+  };
+  chip.addEventListener("click", () => {
+    if (state.aiPicked.has(file.id)) state.aiPicked.delete(file.id);
+    else if (state.aiPicked.size >= MAX_PICKED) return toast(`Pick up to ${MAX_PICKED} files at a time`);
+    else state.aiPicked.add(file.id);
+    paint();
+  });
+  paint();
+  return chip;
+}
+
+function renderAiView() {
+  const channel = state.channel;
+  if (!channel) return;
+  const caps = state.ai.caps;
+  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about #${channel.name}, or anything else…`, "aria-label": "Your question" });
+  const form = el("form", { class: "composer", onsubmit: (event) => {
+    event.preventDefault();
+    const question = input.value.trim();
+    if (!question || state.aiBusy) return;
+    input.value = "";
+    askAi(question);
+  } }, input, el("button", { class: "send", type: "submit", "aria-label": "Ask" }, "↗"));
+  $("ai-view").replaceChildren(
+    el("div", { class: "ai-top" },
+      el("div", {},
+        el("h3", { text: `Ask about #${channel.name}` }),
+        el("p", { class: "muted small", text: `Answers come from ${caps?.ok ? `${caps.model} on your laptop` : "your laptop's AI, which isn't connected yet"}. Only you see this chat, and it stays in this browser.` })),
+      el("div", { class: "ai-top-actions" },
+        caps?.ok ? null : el("button", { class: "btn small primary", type: "button", onclick: openAiSettings }, "Connect AI"),
+        el("button", { class: "btn small ghost", type: "button", onclick: clearAiThread }, "Clear chat"))),
+    state.files.length
+      ? el("div", { class: "file-chips" }, el("span", { class: "muted small", text: "Read in full:" }), ...state.files.map(fileChip))
+      : el("p", { class: "file-chips muted small", text: "No files in this channel yet. You can still ask anything." }),
+    el("div", { class: "ai-thread", id: "ai-thread" }),
+    form);
+  renderAiThread();
+}
+
+function renderAiThread() {
+  const box = $("ai-thread");
+  if (!box || !state.channel) return;
+  const thread = threadFor(state.channel.id);
+  if (!thread.length) {
+    box.replaceChildren(el("p", { class: "ai-empty" }, el("span", { "aria-hidden": "true", text: "✦" }),
+      `Ask about this channel's notes and code. Files with a saved summary are included automatically; tap a file above to have the AI read all of it. For example: "Explain the main idea of the PDF" or "Why does my code print 0?"`));
+    return;
+  }
+  box.replaceChildren(...thread.map((message, index) => {
+    if (message.role === "user") return el("div", { class: "ask-msg own", text: message.text });
+    const node = el("div", { class: `ask-msg md${message.pending && message.text ? " is-streaming" : ""}`, html: message.text ? markdown(message.text) : '<span class="busy-dot"></span>' });
+    if (!message.pending && !message.failed) {
+      node.append(el("div", { class: "ask-actions" },
+        el("button", { class: "link", type: "button", onclick: () => shareAiAnswer(thread[index - 1]?.text, message.text) }, `Share in #${state.channel.name}`)));
+    }
+    return node;
+  }));
+  box.scrollTop = box.scrollHeight;
+}
+
+async function aiMessages(channel, question, history) {
+  const files = state.channel?.id === channel.id ? state.files : [];
+  const parts = [];
+  const images = [];
+  for (const file of files.filter((candidate) => state.aiPicked.has(candidate.id))) {
+    let content = state.aiFileCache.get(file.id);
+    if (!content) {
+      const { data, error } = await supabase.storage.from(BUCKET).download(file.path);
+      if (error) throw error;
+      content = await readForAi(new File([data], file.name, { type: file.mime }));
+      state.aiFileCache.set(file.id, content);
+    }
+    if (content.text) parts.push(`### ${file.name} (full text)\n${content.text}`);
+    else if (state.ai.caps.vision && content.images?.length && !images.length) images.push(content.images[0]);
+  }
+  for (const file of files) if (file.summary && !state.aiPicked.has(file.id)) parts.push(`### ${file.name} (saved summary)\n${file.summary}`);
+  // An image takes about as much of the model's memory as 4,000 characters of text.
+  const room = Math.max(1500, Math.floor(textBudget(state.ai.caps) * 0.7) - question.length - images.length * 4000);
+  const context = parts.join("\n\n").slice(0, room);
+  return [
+    { role: "system", content: `${ASK_SYSTEM}\n\nThe student is in the #${channel.name} channel${channel.course_code ? ` (${channel.course_code})` : ""} of ${state.workspace.name}.${context ? `\n\nFiles in this channel:\n\n${context}` : ""}` },
+    ...history.map((message) => ({ role: message.role, content: message.text.slice(0, 1500) })),
+    { role: "user", content: question, ...(images.length ? { images } : {}) },
+  ];
+}
+
+async function askAi(question) {
+  if (!state.ai.caps?.ok) await refreshAi();
+  if (!state.ai.caps?.ok) {
+    toast("Connect the AI on your laptop first");
+    return openAiSettings();
+  }
+  const channel = state.channel;
+  const thread = threadFor(channel.id);
+  const history = thread.filter((message) => !message.failed).slice(-4);
+  const answer = { role: "assistant", text: "", pending: true };
+  thread.push({ role: "user", text: question }, answer);
+  state.aiBusy = true;
+  renderAiThread();
+  let frame = 0;
+  try {
+    const messages = await aiMessages(channel, question, history);
+    answer.text = await askLocalAi({
+      settings: state.ai.settings,
+      caps: state.ai.caps,
+      onText: (text) => {
+        answer.text = text;
+        if (!frame) frame = requestAnimationFrame(() => {
+          frame = 0;
+          if (state.channel?.id === channel.id && state.tab === "ai") renderAiThread();
+        });
+      },
+    }, messages);
+  } catch (error) {
+    Object.assign(answer, { text: `Couldn't answer: ${error.message === "Failed to fetch" ? "lost the connection to your local AI." : error.message}`, failed: true });
+  }
+  answer.pending = false;
+  state.aiBusy = false;
+  local.set(aiKey(channel.id), thread.slice(-40));
+  if (state.channel?.id === channel.id && state.tab === "ai") renderAiThread();
+}
+
+function clearAiThread() {
+  if (!state.channel || state.aiBusy) return;
+  state.aiThreads.set(state.channel.id, []);
+  local.remove(aiKey(state.channel.id));
+  renderAiThread();
+}
+
+async function shareAiAnswer(question, answer) {
+  const channel = state.channel;
+  if (!channel) return;
+  if (!(await ask({ title: `Share this answer in #${channel.name}?`, body: "Everyone in the workspace will see it in the chat.", okLabel: "Share" }))) return;
+  const body = `🤖 AI answer${question ? ` to "${question.slice(0, 200)}"` : ""}:\n\n${answer}`.slice(0, 4000);
+  const { data, error } = await supabase.from("hub_messages").insert({ workspace_id: state.workspace.id, channel_id: channel.id, body }).select().single();
+  if (error) return toast(error.message);
+  addMessage(data);
+  toast(`Shared in #${channel.name}`);
+}
+
+/* ---------- Admin panel: everything this workspace keeps in Supabase ---------- */
+
+async function openAdmin() {
+  if (state.role !== "admin") return;
+  unsubscribe();
+  clearReply();
+  Object.assign(state, { view: "admin", channel: null, messages: [], files: [], reactions: [] });
+  closePanels();
+  for (const id of ["empty-main", "chat-view", "files-view", "ai-view", "memories-view"]) $(id).hidden = true;
+  $("admin-view").hidden = false;
+  renderSidebar();
+  renderHeader();
+  $("admin-view").replaceChildren(el("p", { class: "loading", text: "Loading everything this workspace stores…" }));
+  await loadAdmin();
+}
+
+async function loadAdmin() {
+  const workspace = state.workspace;
+  try {
+    const [files, memories, messages, members] = await Promise.all([
+      fetchAll(() => supabase.from("hub_files").select("id, name, path, mime, size, channel_id, user_id, summary, created_at").eq("workspace_id", workspace.id).order("created_at", { ascending: false })),
+      fetchAll(() => supabase.from("hub_memories").select("id, path, size, user_id, created_at").eq("workspace_id", workspace.id)).catch(() => []),
+      fetchAll(() => supabase.from("hub_messages").select("channel_id, user_id, created_at").eq("workspace_id", workspace.id)),
+      fetchAll(() => supabase.from("hub_members").select("user_id, role, joined_at, profile:hub_profiles(display_name)").eq("workspace_id", workspace.id).order("joined_at")),
+    ]);
+    if (state.view === "admin" && state.workspace?.id === workspace.id) renderAdmin({ files, memories, messages, members });
+  } catch (error) {
+    $("admin-view").replaceChildren(el("p", { class: "loading", text: `Couldn't load the admin panel: ${error.message}` }));
+  }
+}
+
+function renderAdmin({ files, memories, messages, members }) {
+  const sizeOf = (rows) => rows.reduce((total, row) => total + Number(row.size || 0), 0);
+  const latest = (rows) => rows.reduce((last, row) => (row.created_at > last ? row.created_at : last), "");
+  const channels = orderedChannels();
+  const label = (channel) => {
+    const semester = state.semesters.find((candidate) => candidate.id === channel.semester_id)?.name;
+    return `#${channel.name}${semester ? ` · ${semester}` : ""}`;
+  };
+  const cell = (content, props = {}) => el("td", props, content);
+  const buttons = (...items) => el("div", { class: "row-buttons" }, ...items);
+  const button = (text, onclick, danger = false) => el("button", { class: `btn small ghost${danger ? " danger-text" : ""}`, type: "button", onclick }, text);
+  const table = (headers, rows) => el("div", { class: "table-wrap" }, el("table", {},
+    el("thead", {}, el("tr", {}, ...headers.map((header) => el("th", { text: header })))),
+    el("tbody", {}, ...rows)));
+  const tile = (value, text) => el("div", { class: "tile" }, el("strong", { text: value }), el("span", { text }));
+  const plural = (n, word) => `${word}${n === 1 ? "" : "s"}`;
+
+  const storage = [
+    ...channels.map((channel) => ({ where: label(channel), rows: files.filter((file) => file.channel_id === channel.id) })),
+    { where: "📷 Memories", rows: memories },
+  ].filter((place) => place.rows.length).sort((a, b) => sizeOf(b.rows) - sizeOf(a.rows));
+
+  $("admin-view").replaceChildren(
+    el("div", { class: "files-top" },
+      el("div", {}, el("h3", { text: "Admin panel" }), el("p", { class: "muted small", text: `Everything ${state.workspace.name} keeps in Supabase. Only admins can open this.` })),
+      el("div", { class: "ai-top-actions" }, button("Refresh", loadAdmin), el("button", { class: "btn small primary", type: "button", onclick: downloadBackup }, "Download everything"))),
+    el("div", { class: "tiles" },
+      tile(String(members.length), plural(members.length, "member")),
+      tile(String(channels.length), plural(channels.length, "channel")),
+      tile(String(messages.length), plural(messages.length, "message")),
+      tile(String(files.length), plural(files.length, "file")),
+      tile(String(memories.length), plural(memories.length, "photo")),
+      tile(sizeOf(files) + sizeOf(memories) ? formatSize(sizeOf(files) + sizeOf(memories)) : "0 MB", "of 100 MB used")),
+    el("section", {}, el("h4", { text: "Storage" }), storage.length
+      ? table(["Where", "Items", "Size", "Share of 100 MB"], storage.map((place) => el("tr", {},
+        cell(place.where),
+        cell(String(place.rows.length), { class: "num" }),
+        cell(formatSize(sizeOf(place.rows)), { class: "num" }),
+        cell(el("span", { class: "bar-track" }, el("span", { class: "bar", style: `width:${Math.max(1, Math.min(100, (sizeOf(place.rows) / STORAGE_LIMIT) * 100))}%` }))))))
+      : el("p", { class: "muted small", text: "Nothing stored yet." })),
+    el("section", {}, el("h4", { text: "Channels" }), table(["Channel", "Messages", "Files", "Last message", ""], channels.map((channel) => {
+      const said = messages.filter((message) => message.channel_id === channel.id);
+      const last = latest(said);
+      return el("tr", {},
+        cell(label(channel)),
+        cell(String(said.length), { class: "num" }),
+        cell(String(files.filter((file) => file.channel_id === channel.id).length), { class: "num" }),
+        cell(last ? timeLabel(last) : "None yet"),
+        cell(buttons(button("Open", () => openChannel(channel.id)), button("Download chat", () => downloadChat(channel)))));
+    }))),
+    el("section", {}, el("h4", { text: "Members" }), table(["Name", "Role", "Joined", "Messages", "Files", "Last message", ""], members.map((row) => {
+      const member = state.members.get(row.user_id) || { user_id: row.user_id, role: row.role, display_name: row.profile?.display_name || "Member" };
+      const said = messages.filter((message) => message.user_id === row.user_id);
+      const owner = row.user_id === state.workspace.created_by;
+      const last = latest(said);
+      return el("tr", {},
+        cell(`${member.display_name}${row.user_id === state.user.id ? " (you)" : ""}`),
+        cell(owner ? "Owner" : row.role === "admin" ? "Admin" : "Member"),
+        cell(timeLabel(row.joined_at)),
+        cell(String(said.length), { class: "num" }),
+        cell(String(files.filter((file) => file.user_id === row.user_id).length), { class: "num" }),
+        cell(last ? timeLabel(last) : "None yet"),
+        cell(owner || row.user_id === state.user.id ? "" : buttons(
+          button(member.role === "admin" ? "Make member" : "Make admin", async () => {
+            await setRole(member, member.role === "admin" ? "member" : "admin");
+            loadAdmin();
+          }),
+          button("Remove", async () => {
+            await removeMember(member);
+            loadAdmin();
+          }, true))));
+    }))),
+    el("section", {}, el("h4", { text: `All files (${files.length})` }), files.length
+      ? table(["File", "Channel", "Shared by", "Size", "Added", "AI summary", ""], files.map((file) => el("tr", {},
+        cell(file.name, { class: "file-name", title: file.name }),
+        cell(`#${state.channels.find((channel) => channel.id === file.channel_id)?.name || "deleted"}`),
+        cell(nameOf(file.user_id)),
+        cell(formatSize(file.size), { class: "num" }),
+        cell(timeLabel(file.created_at)),
+        cell(file.summary ? "Saved" : "None"),
+        cell(buttons(button("Open", () => openFile(file)), button("Delete", () => deleteFile(file), true))))))
+      : el("p", { class: "muted small", text: "No files yet." })),
+    el("p", { class: "muted small admin-note", text: "Sign-in emails and passwords are kept by Supabase's sign-in service and never shown here, so classmates' emails stay private. The Supabase project owner can see accounts in the Supabase dashboard under Authentication → Users." }));
+}
+
+async function deleteFile(file) {
+  if (!(await ask({ title: `Delete ${file.name}?`, body: "The file and the chat message that shared it are deleted for everyone.", okLabel: "Delete", danger: true }))) return;
+  const result = await supabase.from("hub_files").delete().eq("id", file.id).select("id");
+  if (failed(result, "Only the uploader or an admin can delete this file.")) return;
+  await supabase.storage.from(BUCKET).remove([file.path]);
+  refreshStorage();
+  loadAdmin();
+  toast(`Deleted ${file.name}`);
+}
+
 /* ---------- Local AI ---------- */
 
 async function refreshAi() {
@@ -1577,7 +1941,7 @@ function toggleMenu(open = $("ws-menu").hidden) {
   if (!open) return;
   const admin = state.role === "admin";
   const owner = state.workspace.created_by === state.user.id;
-  const hiddenFor = { invite: false, settings: !admin, semester: !admin, channel: !admin, backup: false, leave: owner, delete: !owner };
+  const hiddenFor = { invite: false, settings: !admin, admin: !admin, semester: !admin, channel: !admin, backup: false, leave: owner, delete: !owner };
   $("ws-menu").querySelectorAll("button").forEach((button) => { button.hidden = hiddenFor[button.dataset.ws]; });
 }
 
@@ -1589,7 +1953,7 @@ $("ws-menu").addEventListener("click", (event) => {
   const action = event.target.closest("button")?.dataset.ws;
   if (!action) return;
   toggleMenu(false);
-  ({ invite: showInvite, settings: editWorkspace, semester: addSemester, channel: () => addChannel(null), backup: downloadBackup, leave: leaveWorkspace, delete: deleteWorkspace })[action]();
+  ({ invite: showInvite, settings: editWorkspace, admin: openAdmin, semester: addSemester, channel: () => addChannel(null), backup: downloadBackup, leave: leaveWorkspace, delete: deleteWorkspace })[action]();
 });
 document.addEventListener("click", (event) => {
   if (!$("ws-menu").hidden && !event.target.closest("#ws-menu")) toggleMenu(false);
@@ -1606,6 +1970,7 @@ $("new-workspace").addEventListener("click", createWorkspace);
 $("join-workspace").addEventListener("click", joinWithCode);
 $("profile-btn").addEventListener("click", editProfile);
 $("notifications-btn").addEventListener("click", openNotifications);
+$("download-chat").addEventListener("click", () => downloadChat());
 window.addEventListener("focus", readOpenChannel);
 document.addEventListener("visibilitychange", readOpenChannel);
 $("reply-cancel").addEventListener("click", clearReply);

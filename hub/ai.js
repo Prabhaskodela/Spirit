@@ -250,7 +250,17 @@ function splitText(text, size) {
 
 const userMessage = (content, images) => ({ role: "user", content, ...(images?.length ? { images } : {}) });
 // How much text fits in one request, from the model's context window (~3.2 characters per token, with room for the answer).
-const textBudget = (caps) => Math.max(4000, Math.floor(((caps.contextLength || 4096) - 1300) * 3.2));
+export const textBudget = (caps) => Math.max(4000, Math.floor(((caps.contextLength || 4096) - 1300) * 3.2));
+
+// A file's text (or, for images and scanned PDFs, its pictures) for the Ask AI chat.
+export function readForAi(file) {
+  return file.type === "application/pdf" ? readPdf(file) : readImage(file);
+}
+
+// A free-form question with whatever context the caller put in messages. options: { settings, caps, signal, onText }
+export function askLocalAi(options, messages) {
+  return chat(options, messages, 900);
+}
 
 async function notesThenMerge(name, inputs, describe, options) {
   const notes = [];

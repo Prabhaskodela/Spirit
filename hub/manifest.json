@@ -2,7 +2,7 @@
   "id": "/Spirit/hub/",
   "name": "SpiritHUB Workspaces",
   "short_name": "SpiritHUB",
-  "description": "SpiritHUB Workspaces: class rooms for semesters, channels, shared files, conversations, and AI summaries.",
+  "description": "A class collaboration space for semesters, subject channels, shared files, conversations, and memories.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/Spirit/hub/",

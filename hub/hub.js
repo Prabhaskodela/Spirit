@@ -1885,48 +1885,120 @@ function photoField(label, path, round = false) {
   const crop = { zoom: 1, x: 50, y: 50 };
   const preview = el("span", { class: `photo-preview${round ? " round" : ""}` });
   const cropControls = el("div", { class: "photo-crop-controls", hidden: true });
+  const cropBox = el("div", {
+    class: "photo-crop-box",
+    role: "group",
+    tabindex: "0",
+    "aria-label": "Profile photo crop area. Drag to reposition; scroll or pinch to zoom.",
+  });
   const show = (url) => {
-    preview.replaceChildren(url ? el("img", { src: url, alt: "Profile photo crop preview" }) : el("span", { text: "No photo selected" }));
+    preview.replaceChildren(url ? el("img", { src: url, alt: "Profile photo preview" }) : el("span", { text: "No photo selected" }));
+    const cropImage = url ? el("img", { src: url, alt: "" }) : null;
+    if (cropImage) cropImage.addEventListener("load", syncCropPreview, { once: true });
+    cropBox.replaceChildren(cropImage || el("span", { class: "photo-crop-empty", text: "Choose a photo to crop" }));
     syncCropPreview();
   };
   function syncCropPreview() {
-    const image = preview.querySelector("img");
-    if (!image) return;
-    image.style.objectPosition = `${crop.x}% ${crop.y}%`;
-    image.style.transform = `scale(${crop.zoom})`;
+    const smallImage = preview.querySelector("img");
+    if (smallImage) {
+      smallImage.style.objectPosition = `${crop.x}% ${crop.y}%`;
+      smallImage.style.transform = `scale(${crop.zoom})`;
+    }
+    const image = cropBox.querySelector("img");
+    if (!image || !image.naturalWidth) return;
+    const boxSize = cropBox.clientWidth;
+    if (!boxSize) return;
+    const scale = Math.max(boxSize / image.naturalWidth, boxSize / image.naturalHeight) * crop.zoom;
+    const width = image.naturalWidth * scale;
+    const height = image.naturalHeight * scale;
+    image.style.width = width + "px";
+    image.style.height = height + "px";
+    image.style.left = -Math.max(0, width - boxSize) * crop.x / 100 + "px";
+    image.style.top = -Math.max(0, height - boxSize) * crop.y / 100 + "px";
   }
   if (path) loadPhoto(path).then((url) => { if (!picked && !removed) show(url); }).catch(() => {});
   const remove = el("button", { class: "link small danger", type: "button", hidden: !path }, "Remove");
   const input = el("input", { type: "file", accept: MEMORY_TYPES.join(","), hidden: true });
-  const zoom = el("input", { type: "range", min: "1", max: "2.5", step: "0.05", value: "1", "aria-label": "Photo zoom" });
-  const horizontal = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo left or right" });
-  const vertical = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo up or down" });
-  const zoomValue = el("span", { text: "1×" });
-  const horizontalValue = el("span", { text: "50%" });
-  const verticalValue = el("span", { text: "50%" });
-  const resetCrop = () => {
-    crop.zoom = 1; crop.x = 50; crop.y = 50;
-    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50";
-    zoomValue.textContent = "1×"; horizontalValue.textContent = "50%"; verticalValue.textContent = "50%";
-    syncCropPreview();
+  const clampZoom = (value) => Math.max(1, Math.min(3, value));
+  const setZoom = (value) => { crop.zoom = clampZoom(value); syncCropPreview(); };
+  const cropPointers = new Map();
+  let dragStart = null;
+  let pinchStart = null;
+  const getOverflow = () => {
+    const image = cropBox.querySelector("img");
+    const boxSize = cropBox.clientWidth;
+    if (!image?.naturalWidth || !boxSize) return { x: 0, y: 0 };
+    const scale = Math.max(boxSize / image.naturalWidth, boxSize / image.naturalHeight) * crop.zoom;
+    return {
+      x: Math.max(0, image.naturalWidth * scale - boxSize),
+      y: Math.max(0, image.naturalHeight * scale - boxSize),
+    };
   };
-  const setControl = (name, input, value) => el("label", { class: "photo-crop-control" },
-    el("span", {}, el("span", { text: name }), value), input);
-  cropControls.append(
-    el("div", { class: "photo-crop-heading" }, el("strong", { text: "Adjust your profile photo" }), el("span", { text: "Frame it before you save" })),
-    setControl("Zoom", zoom, zoomValue),
-    setControl("Horizontal position", horizontal, horizontalValue),
-    setControl("Vertical position", vertical, verticalValue),
-    el("div", { class: "photo-crop-footer" },
-      el("p", { class: "photo-crop-hint", text: "The circular preview shows how classmates will see it." }),
-      el("button", { class: "photo-crop-reset", type: "button", onclick: resetCrop }, "Reset crop")));
-  zoom.addEventListener("input", () => {
-    crop.zoom = Number(zoom.value);
-    zoomValue.textContent = `${crop.zoom.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}×`;
+  cropBox.addEventListener("pointerdown", (event) => {
+    if (!round || !picked) return;
+    event.preventDefault();
+    cropBox.setPointerCapture(event.pointerId);
+    cropPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (cropPointers.size >= 2) {
+      const [first, second] = [...cropPointers.values()];
+      pinchStart = { distance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)), zoom: crop.zoom };
+      dragStart = null;
+    } else {
+      pinchStart = null;
+      dragStart = { id: event.pointerId, x: event.clientX, y: event.clientY, cropX: crop.x, cropY: crop.y };
+    }
+  });
+  cropBox.addEventListener("pointermove", (event) => {
+    if (!cropPointers.has(event.pointerId)) return;
+    cropPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (cropPointers.size >= 2 && pinchStart) {
+      const [first, second] = [...cropPointers.values()];
+      setZoom(pinchStart.zoom * Math.hypot(second.x - first.x, second.y - first.y) / pinchStart.distance);
+      return;
+    }
+    if (dragStart?.id !== event.pointerId) return;
+    const overflow = getOverflow();
+    crop.x = overflow.x ? Math.max(0, Math.min(100, dragStart.cropX - (event.clientX - dragStart.x) * 100 / overflow.x)) : 50;
+    crop.y = overflow.y ? Math.max(0, Math.min(100, dragStart.cropY - (event.clientY - dragStart.y) * 100 / overflow.y)) : 50;
     syncCropPreview();
   });
-  horizontal.addEventListener("input", () => { crop.x = Number(horizontal.value); horizontalValue.textContent = `${crop.x}%`; syncCropPreview(); });
-  vertical.addEventListener("input", () => { crop.y = Number(vertical.value); verticalValue.textContent = `${crop.y}%`; syncCropPreview(); });
+  const endCropPointer = (event) => {
+    cropPointers.delete(event.pointerId);
+    if (cropPointers.size >= 2) {
+      const [first, second] = [...cropPointers.values()];
+      pinchStart = { distance: Math.max(1, Math.hypot(second.x - first.x, second.y - first.y)), zoom: crop.zoom };
+      dragStart = null;
+    } else if (cropPointers.size === 1) {
+      const [id, point] = [...cropPointers.entries()][0];
+      pinchStart = null;
+      dragStart = { id, x: point.x, y: point.y, cropX: crop.x, cropY: crop.y };
+    } else {
+      pinchStart = null;
+      dragStart = null;
+    }
+  };
+  cropBox.addEventListener("pointerup", endCropPointer);
+  cropBox.addEventListener("pointercancel", endCropPointer);
+  cropBox.addEventListener("wheel", (event) => {
+    if (!round || !picked) return;
+    event.preventDefault();
+    setZoom(crop.zoom * Math.exp(-event.deltaY * 0.002));
+  }, { passive: false });
+  cropBox.addEventListener("keydown", (event) => {
+    if (event.key !== "+" && event.key !== "=" && event.key !== "-") return;
+    event.preventDefault();
+    setZoom(crop.zoom + (event.key === "-" ? -0.1 : 0.1));
+  });
+  const resetCrop = () => {
+    crop.zoom = 1; crop.x = 50; crop.y = 50;
+    syncCropPreview();
+  };
+  cropControls.append(
+    el("div", { class: "photo-crop-heading" }, el("strong", { text: "Adjust your profile photo" }), el("span", { text: "Drag to frame it before you save" })),
+    cropBox,
+    el("div", { class: "photo-crop-footer" },
+      el("p", { class: "photo-crop-hint", text: "Drag to reposition · scroll or pinch to zoom" }),
+      el("button", { class: "photo-crop-reset", type: "button", onclick: resetCrop }, "Reset")));
   input.addEventListener("change", () => {
     const [file] = input.files;
     input.value = "";
@@ -1938,6 +2010,7 @@ function photoField(label, path, round = false) {
     previewUrl = URL.createObjectURL(file);
     show(previewUrl);
     cropControls.hidden = !round;
+    if (round) requestAnimationFrame(syncCropPreview);
     if (choose.firstChild) choose.firstChild.textContent = round ? "Change profile photo" : "Change photo";
     remove.hidden = false;
   });
@@ -1952,7 +2025,7 @@ function photoField(label, path, round = false) {
   });
   const choose = el("label", { class: "btn small ghost photo-choose" }, round ? (path ? "Change profile photo" : "Choose profile photo") : (path ? "Change photo" : "Choose photo"), input);
   const photoHint = el("p", { class: "photo-field-hint", text: round
-    ? "Choose a photo, then adjust the zoom and position before saving."
+    ? "Choose a photo, then drag inside the crop box. Scroll or pinch to zoom."
     : "Choose an image to preview it before saving." });
   return {
     node: el("div", { class: `field photo-field${round ? " is-croppable" : ""}` },
@@ -1960,11 +2033,9 @@ function photoField(label, path, round = false) {
       el("div", { class: "photo-row" }, preview, choose, remove),
       round ? photoHint : null,
       cropControls),
-    // A selected profile photo includes its framing controls for the final square crop.
     change: () => (picked ? { file: picked, crop: round ? { ...crop } : null } : removed ? { file: null } : null),
   };
 }
-
 async function uploadPhoto(folder, kind, file, edge, square) {
   const photo = await resizeImage(file, edge, { square, fill: "#101116" });
   const path = `${folder}/${kind}-${crypto.randomUUID()}.jpg`;

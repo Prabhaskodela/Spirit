@@ -1289,3 +1289,13 @@ a,.link{color:#a7ddcb}
 .channel-group-logo{width:28px;height:28px;display:grid;place-items:center;overflow:hidden;border:1px solid #ffffff12;border-radius:9px;background:#ffffff05;color:#d3d9e6;font:600 10px/1 'Space Grotesk',sans-serif}
 .channel-group-logo .rail-photo,.channel-title .hash .rail-photo{width:100%;height:100%;border-radius:inherit;object-fit:cover}
 .channel-title .hash{overflow:hidden}
+
+/* Keep sent-message controls beside the bubble on the same row. */
+.message.own>.own-message-row{display:flex;width:100%;min-width:0;align-items:center;justify-content:flex-end;gap:8px}
+.message.own>.own-message-row>.msg-main{width:min(78%,720px);min-width:0;flex:0 1 auto;margin:0;display:flex;flex-direction:column;align-items:flex-end}
+.message.own .msg-menu{position:relative;z-index:3;flex:0 0 30px;align-self:center}
+.message.own .msg-menu-trigger{list-style:none;display:grid;width:30px;height:30px;place-items:center;border:1px solid #ffffff18;border-radius:9px;background:var(--raised);color:var(--muted);font-size:20px;line-height:1;cursor:pointer}
+.message.own .msg-menu-trigger::-webkit-details-marker{display:none}
+.message.own .msg-menu-trigger:hover,.message.own .msg-menu[open] .msg-menu-trigger{background:#ffffff12;color:var(--text)}
+.message.own .msg-actions{position:absolute;top:calc(100% + 6px);right:0}
+@media(max-width:640px){.message.own>.own-message-row>.msg-main{width:min(88%,620px)}}

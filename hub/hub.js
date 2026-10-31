@@ -78,6 +78,8 @@ const state = {
   aiFileCache: new Map(),
   aiThreads: new Map(),
   aiBusy: false,
+  spiritAiBusy: false,
+  spiritAiThreads: new Map(),
 };
 
 const storage = (area) => ({
@@ -849,6 +851,8 @@ function setTab(tab) {
   $("chat-view").hidden = tab !== "chat";
   $("files-view").hidden = tab !== "files";
   $("ai-view").hidden = tab !== "ai";
+  $("spirit-ai-view").hidden = tab !== "spirit-ai";
+  if (tab === "spirit-ai") renderSpiritAiView();
   if (tab === "ai") renderAiView();
   renderHeader();
   renderTypingIndicator();

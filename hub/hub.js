@@ -1114,18 +1114,40 @@ async function showInvite() {
   if (!data) return toast("Only admins can share the invite until the latest database update is installed.");
   const linkInput = el("input", { class: "input", readonly: true, value: inviteLink(data.code), "aria-label": "Invite link" });
   const codeText = el("code", { text: data.code });
+  const customCodeInput = el("input", { class: "input", maxlength: 24, value: data.code, placeholder: "e.g. squad186", autocomplete: "off", autocapitalize: "none", spellcheck: "false", "aria-label": "Custom room invite code" });
   const reset = async () => {
     if (!confirm("Reset the invite? The old link and code stop working for anyone who hasn't joined yet.")) return;
     const result = await supabase.rpc("hub_reset_invite", { ws: state.workspace.id });
     if (result.error) return toast(result.error.message);
     linkInput.value = inviteLink(result.data);
     codeText.textContent = result.data;
+    customCodeInput.value = result.data;
     toast("New invite ready. The old link and code no longer work.");
+  };
+  const saveCustomCode = async () => {
+    const code = customCodeInput.value.trim().toLowerCase();
+    if (!/^[a-z0-9]{4,24}$/.test(code)) return toast("Use 4–24 letters or numbers, with no spaces.");
+    if (code === codeText.textContent) return toast("That invite code is already in use for this room.");
+    if (!confirm("Changing the invite code disables the current code and link for anyone who hasn't joined yet. Continue?")) return;
+    const result = await supabase.rpc("hub_set_invite", { ws: state.workspace.id, invite_code: code });
+    if (result.error) {
+      if (/hub_set_invite|function.*not found/i.test(result.error.message)) return toast("Custom codes need database update 006 installed by the project owner.");
+      if (result.error.code === "23505" || /already in use|duplicate key/i.test(result.error.message)) return toast("That invite code is already in use. Choose another.");
+      return toast(result.error.message);
+    }
+    codeText.textContent = result.data;
+    customCodeInput.value = result.data;
+    linkInput.value = inviteLink(result.data);
+    toast("Custom room invite code saved. The previous code no longer works.");
   };
   const body = el("div", {},
     el("p", { class: "muted", text: "Anyone with this link can create an account with their email and their own password, then join. Share it in your class group." }),
     el("div", { class: "copy-row" }, linkInput, el("button", { class: "btn", type: "button", onclick: () => copyText(linkInput.value, "Invite link copied") }, "Copy")),
     el("p", { class: "muted small" }, "Or they can press ↗ (Join) and type the code ", codeText, "."),
+    state.role === "admin" ? el("section", { class: "custom-invite" },
+      el("h3", { text: "Choose a custom code" }),
+      el("p", { class: "muted small", text: "Use 4–24 letters or numbers. Saving it replaces the old code and invite link." }),
+      el("div", { class: "custom-invite-row" }, customCodeInput, el("button", { class: "btn primary", type: "button", onclick: saveCustomCode }, "Save code"))) : null,
     state.role === "admin" ? el("button", { class: "link danger", type: "button", onclick: reset }, "Reset invite") : null);
   await ask({ title: `Invite people to ${state.workspace.name}`, body, okLabel: "Done", cancelLabel: null });
 }

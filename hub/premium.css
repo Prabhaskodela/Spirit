@@ -922,3 +922,10 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 .channel-link .channel-team-mark .header-icon{width:17px;height:17px;overflow:visible}
 .channel.is-active .channel-link .channel-team-mark{border-color:#e2aa6280;background:#3a2a20;color:#f0c78f}
 
+.custom-invite{display:grid;gap:7px;margin:14px 0 10px;padding:12px;border:1px solid #68554b44;border-radius:12px;background:#201a18}
+.custom-invite h3{margin:0;color:#f0e8e8;font-size:14px}
+.custom-invite p{margin:0}
+.custom-invite-row{display:flex;align-items:center;gap:8px;min-width:0}
+.custom-invite-row .input{min-width:0;flex:1;text-transform:lowercase}
+@media(max-width:420px){.custom-invite-row{align-items:stretch;flex-direction:column}.custom-invite-row .btn{align-self:flex-start}}
+

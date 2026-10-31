@@ -801,6 +801,8 @@ function renderSidebar() {
   };
   const tree = [];
   if (workspace) {
+    tree.push(el("button", { class: `spirit-ai-link${state.view === "spirit-ai" ? " is-active" : ""}`, type: "button", onclick: openSpiritAi },
+      el("span", { "aria-hidden": "true", text: "✦" }), "Spirit AI"));
     tree.push(el("button", { class: `memories-link${state.view === "memories" ? " is-active" : ""}`, type: "button", onclick: openMemories },
       el("span", { "aria-hidden": "true", text: "📷" }), "Memories"));
   }
@@ -820,7 +822,7 @@ function renderSidebar() {
 
 function renderHeader() {
   const channel = state.channel;
-  const special = state.workspace && { memories: ["📷", "Memories"], admin: ["🛠", "Admin panel"] }[state.view];
+  const special = state.workspace && { "spirit-ai": ["✦", "Spirit AI"], memories: ["📷", "Memories"], admin: ["🛠", "Admin panel"] }[state.view];
   document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
   const channelMark = $("channel-hash");
@@ -851,8 +853,7 @@ function setTab(tab) {
   $("chat-view").hidden = tab !== "chat";
   $("files-view").hidden = tab !== "files";
   $("ai-view").hidden = tab !== "ai";
-  $("spirit-ai-view").hidden = tab !== "spirit-ai";
-  if (tab === "spirit-ai") renderSpiritAiView();
+  $("spirit-ai-view").hidden = state.view !== "spirit-ai";
   if (tab === "ai") renderAiView();
   renderHeader();
   renderTypingIndicator();
@@ -2942,22 +2943,41 @@ async function deleteFile(file) {
 }
 
 
-/* ---------- Separate online Spirit AI ---------- */
-const spiritAiKey = (channelId) => "spirithub-hub:spirit-ai:" + state.user.id + ":" + channelId;
+/* ---------- Workspace-level online Spirit AI ---------- */
+const spiritAiKey = (workspaceId) => "spirithub-hub:spirit-ai:" + state.user.id + ":" + workspaceId;
 
-function spiritAiThreadFor(channelId) {
-  if (!state.spiritAiThreads.has(channelId)) state.spiritAiThreads.set(channelId, local.get(spiritAiKey(channelId)) || []);
-  return state.spiritAiThreads.get(channelId);
+function spiritAiThreadFor(workspaceId) {
+  if (!state.spiritAiThreads.has(workspaceId)) state.spiritAiThreads.set(workspaceId, local.get(spiritAiKey(workspaceId)) || []);
+  return state.spiritAiThreads.get(workspaceId);
+}
+
+function openSpiritAi() {
+  if (!state.workspace) return;
+  unsubscribe();
+  clearReply();
+  Object.assign(state, { view: "spirit-ai", channel: null, messages: [], files: [], reactions: [] });
+  closePanels();
+  $("empty-main").hidden = true;
+  $("chat-view").hidden = true;
+  $("files-view").hidden = true;
+  $("ai-view").hidden = true;
+  $("spirit-ai-view").hidden = false;
+  $("memories-view").hidden = true;
+  $("admin-view").hidden = true;
+  renderSidebar();
+  renderHeader();
+  refreshStorage();
+  renderSpiritAiView();
 }
 
 function renderSpiritAiView() {
-  const channel = state.channel;
-  if (!channel) return;
+  const workspace = state.workspace;
+  if (!workspace || state.view !== "spirit-ai") return;
   const input = el("input", {
     id: "spirit-ai-input",
     autocomplete: "off",
     maxlength: 4000,
-    placeholder: "Ask Spirit AI about this room…",
+    placeholder: "Ask Spirit AI for this workspace…",
     "aria-label": "Ask Spirit AI",
   });
   const fileInput = el("input", {
@@ -2994,7 +3014,7 @@ function renderSpiritAiView() {
     if (!file) return;
     if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(file.type)) {
       fileInput.value = "";
-      return toast("Attach a PDF, PNG, JPEG, or WebP image.");
+      return toast("Attach a PDF, PNG, JPEG, or WebP file.");
     }
     if (file.size > SPIRIT_AI_MAX_FILE_BYTES) {
       fileInput.value = "";
@@ -3026,10 +3046,10 @@ function renderSpiritAiView() {
     el("div", { class: "ai-top spirit-ai-top" },
       el("div", {},
         el("h3", { text: "Spirit AI" }),
-        el("p", { class: "muted small", text: "Online assistant for this room. Ask a question or attach a screenshot/PDF for explanations, solutions, and code." })),
+        el("p", { class: "muted small", text: "A private assistant for this workspace. Ask questions or attach a screenshot/PDF for explanations, solutions, and code." })),
       el("div", { class: "ai-top-actions" },
         el("span", { class: "spirit-ai-free-label", text: "Free tier" }),
-        el("button", { class: "btn small ghost", type: "button", onclick: () => clearSpiritAiThread(channel.id) }, "Clear chat"))),
+        el("button", { class: "btn small ghost", type: "button", onclick: () => clearSpiritAiThread(workspace.id) }, "Clear chat"))),
     el("p", { class: "spirit-ai-disclosure", text: "Questions and attachments are sent to Google Gemini. Free usage has limits, and Google may use free-tier content to improve its products. Avoid private or sensitive files." }),
     el("div", { class: "ai-thread spirit-ai-thread", id: "spirit-ai-thread" }),
     el("div", { class: "spirit-ai-composer-wrap" }, fileRow, form));
@@ -3038,12 +3058,13 @@ function renderSpiritAiView() {
 
 function renderSpiritAiThread() {
   const box = $("spirit-ai-thread");
-  if (!box || !state.channel) return;
-  const thread = spiritAiThreadFor(state.channel.id);
+  const workspace = state.workspace;
+  if (!box || !workspace || state.view !== "spirit-ai") return;
+  const thread = spiritAiThreadFor(workspace.id);
   if (!thread.length) {
     box.replaceChildren(el("p", { class: "ai-empty" },
       el("span", { "aria-hidden": "true", text: "✦" }),
-      "Ask a question or attach a Python problem screenshot. Spirit AI can explain the steps and write code. This chat stays private on this device."));
+      "Ask a question or attach a Python problem screenshot. Spirit AI can explain the steps and write code. This chat is private on this device."));
     return;
   }
   box.replaceChildren(...thread.map((message) => {
@@ -3063,9 +3084,9 @@ function renderSpiritAiThread() {
 }
 
 async function sendSpiritAi(prompt, file) {
-  const channel = state.channel;
-  if (!channel || state.spiritAiBusy) return;
-  const thread = spiritAiThreadFor(channel.id);
+  const workspace = state.workspace;
+  if (!workspace || state.view !== "spirit-ai" || state.spiritAiBusy) return;
+  const thread = spiritAiThreadFor(workspace.id);
   const history = thread.filter((message) => !message.pending && !message.failed).slice(-8)
     .map((message) => ({ role: message.role, text: message.text }));
   const userMessage = { role: "user", text: prompt, ...(file ? { attachmentName: file.name } : {}) };
@@ -3075,7 +3096,7 @@ async function sendSpiritAi(prompt, file) {
   renderSpiritAiThread();
   try {
     answer.text = await requestSpiritAi(supabase, {
-      channelId: channel.id,
+      workspaceId: workspace.id,
       prompt,
       history,
       file,
@@ -3086,15 +3107,15 @@ async function sendSpiritAi(prompt, file) {
   } finally {
     answer.pending = false;
     state.spiritAiBusy = false;
-    local.set(spiritAiKey(channel.id), thread.slice(-40));
-    if (state.channel?.id === channel.id && state.tab === "spirit-ai") renderSpiritAiThread();
+    local.set(spiritAiKey(workspace.id), thread.slice(-40));
+    if (state.workspace?.id === workspace.id && state.view === "spirit-ai") renderSpiritAiThread();
   }
 }
 
-function clearSpiritAiThread(channelId) {
-  state.spiritAiThreads.set(channelId, []);
-  local.remove(spiritAiKey(channelId));
-  if (state.channel?.id === channelId && state.tab === "spirit-ai") renderSpiritAiThread();
+function clearSpiritAiThread(workspaceId) {
+  state.spiritAiThreads.set(workspaceId, []);
+  local.remove(spiritAiKey(workspaceId));
+  if (state.workspace?.id === workspaceId && state.view === "spirit-ai") renderSpiritAiThread();
 }
 
 /* ---------- Local AI ---------- */

@@ -12,7 +12,7 @@ async function encodeFile(file) {
   return btoa(binary);
 }
 
-export async function askSpiritAi(client, { channelId, prompt, history = [], file = null, signal }) {
+export async function askSpiritAi(client, { workspaceId, prompt, history = [], file = null, signal }) {
   if (!client) throw new Error("Spirit AI isn't connected to this project yet.");
   const { data, error } = await client.auth.getSession();
   if (error || !data.session?.access_token) throw new Error("Sign in again to use Spirit AI.");
@@ -31,7 +31,7 @@ export async function askSpiritAi(client, { channelId, prompt, history = [], fil
       apikey: SUPABASE_ANON_KEY,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ channelId, prompt, history, attachment }),
+    body: JSON.stringify({ workspaceId, prompt, history, attachment }),
     signal,
   });
   const payload = await response.json().catch(() => ({}));

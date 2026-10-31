@@ -912,3 +912,13 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 }
 .channel-title .hash.team-logo .header-icon{width:21px;height:21px;overflow:visible}
 
+/* Replace numbered subject boxes with a circular group mark. */
+.channel-link::before{content:none;display:none;counter-increment:none}
+.channel-link .hash.channel-team-mark{
+  grid-area:1/1/3/2;display:grid;place-items:center;
+  width:28px;height:28px;border:1px solid #c0782840;border-radius:50%;
+  background:linear-gradient(145deg,#30251f,#211a18);color:#e0ad6c;
+}
+.channel-link .channel-team-mark .header-icon{width:17px;height:17px;overflow:visible}
+.channel.is-active .channel-link .channel-team-mark{border-color:#e2aa6280;background:#3a2a20;color:#f0c78f}
+

@@ -755,7 +755,11 @@ function renderSidebar() {
         "aria-label": `${channelName}${unread ? `, ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
         onclick: () => openChannel(channel.id),
       },
-        el("span", { class: "hash", text: "•" }),
+        el("span", { class: "hash channel-team-mark", "aria-hidden": "true" }, (() => {
+          const icon = $("members-toggle").querySelector("svg").cloneNode(true);
+          icon.querySelector("circle")?.remove();
+          return icon;
+        })()),
         el("span", { class: "channel-copy" },
           el("span", { class: "channel-label", text: channelName }),
           channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),

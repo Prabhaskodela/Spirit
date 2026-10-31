@@ -985,7 +985,7 @@ function messageNode(message, grouped, reactions) {
     class: "msg-menu-trigger",
     "aria-label": `More actions for ${nameOf(message.user_id)}'s message`,
     title: "Message actions",
-  }, "⋮");
+  }, el("span", { class: "msg-menu-dots", "aria-hidden": "true" }, el("span"), el("span"), el("span")));
   const runMessageAction = (action) => (event) => {
     actionsMenu.open = false;
     action(event);

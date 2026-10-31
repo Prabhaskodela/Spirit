@@ -320,6 +320,7 @@ a,.link{color:var(--mint)}code{background:#ffffff0d}
 .tab-icon{width:16px;height:16px;flex:0 0 16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab-label{line-height:1}.count{color:#87948a;font-size:10px}
 .icon-btn{color:#a1aea5}.icon-btn:hover{background:#ffffff0c;color:var(--mint)}
+.header-icon{width:17px;height:17px;display:block;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .members-toggle{border:1px solid #ffffff12;border-radius:10px}
 .unread{background:#d99186;color:#271b16}
 .chat{position:relative;flex:1;min-height:0;background:#111715}
@@ -402,12 +403,13 @@ a,.link{color:var(--mint)}code{background:#ffffff0d}
   .rail-list{flex-direction:column;min-width:0}
   .sidebar{grid-column:auto;grid-row:auto;padding-top:0;background:#111815}
   .main{grid-column:1;grid-row:1}
-  .channel-header{grid-template-columns:minmax(0,1fr) auto auto;grid-template-rows:38px 42px;gap:4px 7px;padding:8px 10px 0}
-  .channel-title{grid-area:1/1/2/2;font-size:16px}
-  .channel-sem{grid-area:1/2}.channel-code{display:none}
-  #notifications-btn{grid-area:1/3}
+  .channel-header{grid-template-columns:34px minmax(0,1fr) auto auto;grid-template-rows:38px 42px;gap:4px 7px;padding:8px 10px 0}
+  .menu-toggle{grid-area:1/1;display:grid}
+  .channel-title{grid-area:1/2;font-size:16px}
+  .channel-sem{grid-area:1/3}.channel-code{display:none}
+  #notifications-btn{grid-area:1/4}
   #members-toggle{display:none}
-  .tabs{grid-area:2/1/3/4;width:100%}
+  .tabs{grid-area:2/1/3/5;width:100%}
   .tab{min-width:0;flex:1;gap:6px;padding:0 6px;font-size:11px}
   .tab-icon{width:15px;height:15px;flex-basis:15px}
   .channel-intro{padding:18px 14px 8px}

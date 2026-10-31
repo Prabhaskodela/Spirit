@@ -1369,8 +1369,20 @@ function subscribeNotifications() {
   state.notifications = supabase
     .channel(`hub-notifications-${state.user.id}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "hub_notifications", filter: `user_id=eq.${state.user.id}` }, ({ new: row }) => onNotification(row))
+    // Reading them in another tab or on another device lowers the badge here too.
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "hub_notifications", filter: `user_id=eq.${state.user.id}` }, () => refreshUnread())
     .subscribe();
   refreshUnread();
+}
+
+// Coming back to SpiritHUB counts as reading the channel that's open.
+function readOpenChannel() {
+  if (state.unread && state.channel && document.visibilityState === "visible") markChannelRead(state.channel.id);
+}
+
+async function markAllRead() {
+  const { error } = await supabase.from("hub_notifications").update({ read_at: new Date().toISOString() }).eq("user_id", state.user.id).is("read_at", null);
+  if (!error) refreshUnread();
 }
 
 async function onNotification(row) {
@@ -1403,27 +1415,20 @@ function browserNotificationControl() {
 async function openNotifications() {
   const { data, error } = await supabase.from("hub_notifications").select("*").eq("user_id", state.user.id).order("created_at", { ascending: false }).limit(40);
   if (error) return toast(error.message);
-  const now = () => new Date().toISOString();
+  // Opening the list counts as seeing everything in it, so the badge clears; the list still shows which ones are new.
+  markAllRead();
   const open = async (item) => {
     $("dialog").close("cancel");
-    if (!item.read_at) await supabase.from("hub_notifications").update({ read_at: now() }).eq("id", item.id);
     if (state.workspace?.id !== item.workspace_id) await openWorkspace(item.workspace_id);
     if (item.channel_id && state.channels.some((channel) => channel.id === item.channel_id)) await openChannel(item.channel_id);
-    refreshUnread();
   };
   const list = el("div", { class: "notification-list" }, ...(data.length
     ? data.map((item) => el("button", { class: `notification${item.read_at ? " is-read" : ""}`, type: "button", onclick: () => open(item) },
       el("span", { "aria-hidden": "true", text: item.kind === "birthday" ? "🎂" : "💬" }),
       el("span", {}, el("strong", { text: item.title }), el("small", { text: `${item.body ? `${item.body} · ` : ""}${timeLabel(item.created_at)}` }))))
     : [el("p", { class: "muted", text: "You're all caught up. New messages and birthdays show up here." })]));
-  const markAll = async () => {
-    await supabase.from("hub_notifications").update({ read_at: now() }).eq("user_id", state.user.id).is("read_at", null);
-    list.querySelectorAll(".notification").forEach((row) => row.classList.add("is-read"));
-    refreshUnread();
-  };
-  const body = el("div", {},
-    el("div", { class: "notification-tools" }, el("button", { class: "btn small ghost", type: "button", onclick: markAll }, "Mark all as read"), browserNotificationControl()),
-    list);
+  const browserControl = browserNotificationControl();
+  const body = el("div", {}, browserControl ? el("div", { class: "notification-tools" }, browserControl) : null, list);
   await ask({ title: "Notifications", body, okLabel: "Close", cancelLabel: null });
 }
 
@@ -1601,6 +1606,8 @@ $("new-workspace").addEventListener("click", createWorkspace);
 $("join-workspace").addEventListener("click", joinWithCode);
 $("profile-btn").addEventListener("click", editProfile);
 $("notifications-btn").addEventListener("click", openNotifications);
+window.addEventListener("focus", readOpenChannel);
+document.addEventListener("visibilitychange", readOpenChannel);
 $("reply-cancel").addEventListener("click", clearReply);
 $("emoji-button").addEventListener("click", () => togglePicker("emoji"));
 $("sticker-button").addEventListener("click", () => togglePicker("sticker"));

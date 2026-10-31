@@ -103,6 +103,7 @@ const hue = (id) => parseInt(id.replace(/-/g, "").slice(0, 6), 16) % 360;
 const nameOf = (userId) => state.members.get(userId)?.display_name || "Former member";
 const formatSize = (size) => (size < 1024 * 1024 ? `${Math.max(1, Math.round(size / 1024))} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`);
 const shortTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const channelDisplayName = (raw) => String(raw || "").replace(/[-_]+/gu, " ").replace(/\s+/gu, " ").trim();
 const channelName = (raw) => raw.trim().replace(/\s+/gu, " ").slice(0, 40);
 const inviteLink = (code) => `${location.origin}${location.pathname}#join=${code}`;
 const field = (label, input) => el("label", { class: "field" }, el("span", { text: label }), input);
@@ -557,7 +558,7 @@ function renderSidebar() {
   const channelRow = (channel) => el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}` },
     el("button", { class: "channel-link", type: "button", onclick: () => openChannel(channel.id) },
       el("span", { class: "hash", text: "•" }),
-      el("span", { class: "channel-label", text: channel.name }),
+      el("span", { class: "channel-label", text: channelDisplayName(channel.name) }),
       channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
     admin ? rowActions([[`Edit ${channel.name}`, "✎", () => editChannel(channel)], [`Delete ${channel.name}`, "✕", () => deleteChannel(channel)]]) : null);
   const tree = [];
@@ -585,10 +586,10 @@ function renderHeader() {
   document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
   $("channel-hash").textContent = special ? special[0] : "•";
-  $("channel-name").textContent = special ? special[1] : channel?.name || "";
+  $("channel-name").textContent = special ? special[1] : channelDisplayName(channel?.name || "");
   $("channel-sem").textContent = channel?.semester_id ? state.semesters.find((semester) => semester.id === channel.semester_id)?.name || "" : "";
   $("channel-code").textContent = channel?.course_code || "";
-  $("message-input").placeholder = channel ? `Message ${channel.name}` : "Message";
+  $("message-input").placeholder = channel ? `Message ${channelDisplayName(channel.name)}` : "Message";
   $("file-count").textContent = state.files.length ? String(state.files.length) : "";
   $("members-toggle").hidden = !state.workspace;
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -984,7 +985,7 @@ async function deleteSemester(semester) {
 
 // Name and course code, like the original app's subjects. Resolves to null when cancelled.
 async function channelDetails({ title, okLabel, channel = null }) {
-  const name = el("input", { class: "input", maxlength: 40, value: channel?.name || "", placeholder: "e.g. dsa or web-dev", required: true });
+  const name = el("input", { class: "input", maxlength: 40, value: channel ? channelDisplayName(channel.name) : "", placeholder: "e.g. Data Structures or Web Design", required: true });
   const code = el("input", { class: "input", maxlength: 20, value: channel?.course_code || "", placeholder: "e.g. CS201" });
   const body = el("div", { class: "dialog-fields" },
     el("p", { class: "muted", text: "A channel holds the chat and files for one subject." }),

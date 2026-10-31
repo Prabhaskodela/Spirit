@@ -1,5 +1,5 @@
-const CACHE_NAME = "spirithub-shell-v2";
-const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./app-config.js", "./manifest.json", "./icon.svg"];
+const CACHE_NAME = "spirithub-shell-v4";
+const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./app-config.js", "./manifest.json", "./logo.svg", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));

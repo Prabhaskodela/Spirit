@@ -383,6 +383,7 @@ function resetWorkspace() {
   $("admin-view").hidden = true;
   $("ai-view").hidden = true;
   $("spirit-ai-view").hidden = true;
+  $("spirit-ai-view").hidden = true;
   clearReply();
 }
 
@@ -859,6 +860,7 @@ function showEmpty(kind) {
   $("chat-view").hidden = true;
   $("files-view").hidden = true;
   $("ai-view").hidden = true;
+  $("spirit-ai-view").hidden = true;
   $("memories-view").hidden = true;
   $("admin-view").hidden = true;
   const admin = state.role === "admin";
@@ -2354,6 +2356,7 @@ async function openMemories() {
   $("chat-view").hidden = true;
   $("files-view").hidden = true;
   $("ai-view").hidden = true;
+  $("spirit-ai-view").hidden = true;
   $("admin-view").hidden = true;
   $("memories-view").hidden = false;
   renderSidebar();

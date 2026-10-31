@@ -1,10 +1,17 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./app-config.js";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const configured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL) && !SUPABASE_URL.includes("YOUR_") && SUPABASE_ANON_KEY.length > 30 && !SUPABASE_ANON_KEY.includes("YOUR_");
-const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let createClient = null;
+if (configured) {
+  try {
+    ({ createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"));
+  } catch {
+    // Keep the cached app shell available when the network or CDN is unreachable.
+  }
+}
+const supabase = configured && createClient ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 const state = { user: null, profile: null, rooms: [], room: null, role: "member", semesters: [], semester: null, subjects: [], subject: null, chatChannel: null, subjectChatChannel: null, replyTo: null, subjectReplyTo: null, busy: false };
 const MAX_UPLOAD = 50 * 1024 * 1024;
 const ROOM_STORAGE_LIMIT = 100 * 1024 * 1024;
@@ -33,6 +40,12 @@ function showSetupNote() {
 }
 
 if (!configured) showSetupNote();
+else if (!supabase) {
+  const note = $("#setup-note");
+  note.hidden = false;
+  note.textContent = navigator.onLine ? "SpiritHUB could not connect to its sign-in service. Check your connection and try again." : "You’re offline. Sign-in and shared rooms need an internet connection.";
+  $("#google-sign-in").disabled = true;
+}
 
 $("#google-sign-in").addEventListener("click", async () => {
   if (!supabase) return;
@@ -1316,7 +1329,10 @@ $("#account-name").addEventListener("click", () => {
 $("#account-name").setAttribute("title", "Click to edit your display name");
 
 if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register(new URL("/Spirit/sw.js", window.location.origin)).catch(() => {});
+  const hubApp = window.location.pathname.startsWith("/Spirit/hub/");
+  const workerPath = hubApp ? "/Spirit/hub/sw.js" : "/Spirit/sw.js";
+  const workerScope = hubApp ? "/Spirit/hub/" : "/Spirit/";
+  navigator.serviceWorker.register(workerPath, { scope: workerScope }).catch(() => {});
 }
 
 let pendingInstallPrompt = null;

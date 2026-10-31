@@ -38,13 +38,12 @@ For classmates on other devices, publish the repo with GitHub Pages (repo **Sett
 
 ## 3. Local AI on each laptop
 
-1. Install [Ollama](https://ollama.com/download) and run `ollama pull qwen3.5:4b` (3.4 GB).
-2. In SpiritHUB, click **⚙** next to your name → **Test connection** → **Save**. Change the address if your Ollama uses a different port.
-3. If you use the published site rather than localhost, allow it in Ollama once, then quit and reopen Ollama:
-   - Mac: `launchctl setenv OLLAMA_ORIGINS "https://<owner>.github.io"`
-   - Windows: `setx OLLAMA_ORIGINS "https://<owner>.github.io"`
+One command per laptop installs Ollama if needed, lets the SpiritHUB website use it (kept after restarts), and downloads the `qwen3.5:4b` model (about 3.4 GB):
 
-   Chrome may also ask to let the site reach devices on your local network. Allow it.
+- **Mac**, in Terminal: `curl -fsSL https://prabhaskodela.github.io/Spirit/hub/setup/mac.sh | bash`
+- **Windows**, in PowerShell: `irm https://prabhaskodela.github.io/Spirit/hub/setup/windows.ps1 | iex`
+
+Then in SpiritHUB click **⚙** next to your name → **Test connection** → **Save**. The ⚙ dialog shows these commands with a Copy button whenever it can't reach Ollama. Chrome may ask to let the site reach devices on your local network; allow it. The scripts are in `hub/setup/`; set `SPIRITHUB_SITE` to allow a different address.
 
 The file goes from Supabase to your browser and to the model on your laptop. It isn't sent anywhere else.
 

@@ -1465,20 +1465,35 @@ function aiHelp(result, model) {
   if (result.ok) {
     return [el("p", { class: "ok", text: `Connected: Ollama ${result.version}, ${result.model}${result.vision ? ", reads PDFs and screenshots." : ". Text only: screenshots need a vision model."}` })];
   }
-  const localPage = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-  const steps = [
-    el("li", {}, "Install Ollama from ", el("a", { href: "https://ollama.com/download", target: "_blank", rel: "noopener" }, "ollama.com"), " and open it."),
-    el("li", {}, "In Terminal, run ", el("code", { text: `ollama pull ${model}` }), "."),
-  ];
-  if (!localPage) {
-    steps.push(el("li", {}, "Let this site talk to Ollama. On a Mac run ",
-      el("code", { text: `launchctl setenv OLLAMA_ORIGINS "${location.origin}"` }), "; on Windows run ",
-      el("code", { text: `setx OLLAMA_ORIGINS "${location.origin}"` }), ". Then quit and reopen Ollama."));
-  }
   const headline = result.reason === "missing-model"
     ? `Ollama is running, but ${result.model} isn't installed.`
-    : result.reason === "unreachable" ? "Can't reach Ollama at that address." : result.message;
-  return [el("p", { class: "bad", text: headline }), el("ol", {}, ...steps)];
+    : result.reason === "unreachable" ? "Can't reach Ollama on this laptop yet." : result.message;
+  const commands = setupCommands();
+  if (/Windows/i.test(navigator.userAgent)) commands.reverse(); // this computer's command first
+  return [
+    el("p", { class: "bad", text: headline }),
+    el("p", { text: "Set it up with one command. It installs Ollama, lets SpiritHUB use it, and downloads the AI model (about 3.5 GB):" }),
+    ...commands.map(({ label, text }) => el("div", { class: "setup-command" },
+      el("small", { text: label }),
+      el("div", { class: "copy-row" },
+        el("code", { text }),
+        el("button", { class: "btn small", type: "button", onclick: () => copyText(text, "Command copied") }, "Copy")))),
+    model === AI_DEFAULTS.model ? null : el("p", { class: "small" }, "You picked a different model, so also run ", el("code", { text: `ollama pull ${model}` }), "."),
+    el("p", { class: "muted small", text: "When it says All set, press Test connection again." }),
+  ].filter(Boolean);
+}
+
+// The scripts in hub/setup/ allow this site by default; any other address passes its own along.
+const SETUP_SITE = "https://prabhaskodela.github.io";
+
+function setupCommands() {
+  const script = (file) => new URL(`setup/${file}`, location.href).href;
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname); // Ollama trusts these already
+  const site = !local && location.origin !== SETUP_SITE ? location.origin : null;
+  return [
+    { label: "Mac: paste this into Terminal", text: `curl -fsSL ${script("mac.sh")} | ${site ? `SPIRITHUB_SITE=${site} ` : ""}bash` },
+    { label: "Windows: paste this into PowerShell", text: `${site ? `$env:SPIRITHUB_SITE="${site}"; ` : ""}irm ${script("windows.ps1")} | iex` },
+  ];
 }
 
 async function openAiSettings() {

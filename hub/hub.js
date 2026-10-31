@@ -112,7 +112,7 @@ function hideMessageForMe(message) {
   toast("Message hidden for you");
 }
 
-const channelName = (raw) => raw.trim().replace(/\\s+/gu, " ").slice(0, 40);
+const channelName = (raw) => raw.trim().replace(/\s+/gu, " ").slice(0, 40);
 const inviteLink = (code) => `${location.origin}${location.pathname}#join=${code}`;
 const field = (label, input) => el("label", { class: "field" }, el("span", { text: label }), input);
 const isBirthday = (person) => {

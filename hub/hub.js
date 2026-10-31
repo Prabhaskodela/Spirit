@@ -1545,20 +1545,22 @@ function photoField(label, path, round = false) {
   const horizontal = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo left or right" });
   const vertical = el("input", { type: "range", min: "0", max: "100", step: "1", value: "50", "aria-label": "Move photo up or down" });
   const zoomValue = el("span", { text: "1×" });
+  const horizontalValue = el("span", { text: "50%" });
+  const verticalValue = el("span", { text: "50%" });
   const setControl = (name, input, value) => el("label", { class: "photo-crop-control" },
     el("span", {}, el("span", { text: name }), value), input);
   cropControls.append(
     setControl("Zoom", zoom, zoomValue),
-    setControl("Horizontal", horizontal, el("span", { text: "Center" })),
-    setControl("Vertical", vertical, el("span", { text: "Center" })),
+    setControl("Horizontal", horizontal, horizontalValue),
+    setControl("Vertical", vertical, verticalValue),
     el("p", { class: "photo-crop-hint", text: "Adjust the framing before saving." }));
   zoom.addEventListener("input", () => {
     crop.zoom = Number(zoom.value);
     zoomValue.textContent = `${crop.zoom.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}×`;
     syncCropPreview();
   });
-  horizontal.addEventListener("input", () => { crop.x = Number(horizontal.value); syncCropPreview(); });
-  vertical.addEventListener("input", () => { crop.y = Number(vertical.value); syncCropPreview(); });
+  horizontal.addEventListener("input", () => { crop.x = Number(horizontal.value); horizontalValue.textContent = `${crop.x}%`; syncCropPreview(); });
+  vertical.addEventListener("input", () => { crop.y = Number(vertical.value); verticalValue.textContent = `${crop.y}%`; syncCropPreview(); });
   input.addEventListener("change", () => {
     const [file] = input.files;
     input.value = "";
@@ -1567,7 +1569,7 @@ function photoField(label, path, round = false) {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     [picked, removed] = [file, false];
     crop.zoom = 1; crop.x = 50; crop.y = 50;
-    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50"; zoomValue.textContent = "1×";
+    zoom.value = "1"; horizontal.value = "50"; vertical.value = "50"; zoomValue.textContent = "1×"; horizontalValue.textContent = "50%"; verticalValue.textContent = "50%";
     previewUrl = URL.createObjectURL(file);
     show(previewUrl);
     cropControls.hidden = !round;

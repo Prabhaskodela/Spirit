@@ -3,7 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 import * as backup from "./backup.js";
-import { SPIRIT_AI_MAX_FILE_BYTES, spiritAiMimeType, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261101-spirit-ai-8";
+import { SPIRIT_AI_MAX_FILE_BYTES, spiritAiMimeType, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261101-spirit-ai-9";
 
 const BUCKET = "hub-files";
 const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];

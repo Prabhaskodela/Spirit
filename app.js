@@ -214,7 +214,7 @@ function subscribeNotifications() {
   if (notificationChannel) supabase.removeChannel(notificationChannel);
   notificationChannel = supabase.channel(`user-notifications-${state.user.id}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${state.user.id}` }, (payload) => {
     refreshNotificationCount();
-    if ("Notification" in window && Notification.permission === "granted") new Notification(payload.new.title, { body: payload.new.body, icon: "./icon.svg", tag: payload.new.event_key });
+    if ("Notification" in window && Notification.permission === "granted") new Notification(payload.new.title, { body: payload.new.body, icon: "/Spirit/icons/icon-192.png", tag: payload.new.event_key });
   }).subscribe();
   refreshNotificationCount();
 }

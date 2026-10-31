@@ -1649,9 +1649,6 @@ window.addEventListener("hashchange", async () => {
   toast("You joined the workspace");
 });
 
-// Pages under hub/ get their own worker, so the original app's offline cache never serves old copies of this one.
-if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./sw.js").catch(() => {});
-
 if (!configured) {
   $("setup").hidden = false;
 } else {

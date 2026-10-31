@@ -12,6 +12,18 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="hub.css">
   <script type="module" src="hub.js"></script>
+  <script>
+    // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
+    // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
+    // may still be handing out an old hub.js; once this worker takes over, one reload brings the current files.
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      const previous = navigator.serviceWorker.controller;
+      if (previous && !previous.scriptURL.endsWith("/hub/sw.js")) {
+        navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
+      }
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    }
+  </script>
 </head>
 <body>
   <section class="center-screen" id="setup" hidden>

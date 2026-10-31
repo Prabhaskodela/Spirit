@@ -2094,7 +2094,10 @@ async function freeUpSpace(files) {
   if (!files.length) return;
   if (!(await hasArchiveColumn())) return toast("Ask the Supabase project owner to run update 004 (hub/updates/004-free-up-space-and-mentions.sql) first.");
   const total = formatSize(sizeOf(files));
-  const body = `${countOf(files.length, "file")} will be saved on this device, then removed from SpiritHUB's online storage. They stay in the chat as archived files, with their AI summaries, and open on devices that backed them up.`;
+  const one = files.length === 1;
+  const body = `${countOf(files.length, "file")} will be saved on this device, then removed from SpiritHUB's online storage. ${one
+    ? "It stays in the chat as an archived file, with its AI summary, and opens on devices that backed it up."
+    : "They stay in the chat as archived files, with their AI summaries, and open on devices that backed them up."}`;
   if (!(await ask({ title: `Free up ${total}?`, body, okLabel: `Free up ${total}`, danger: true }))) return;
   const workspaceId = state.workspace.id;
   try {
@@ -2119,7 +2122,7 @@ async function freeUpSpace(files) {
   refreshStorage();
   loadAdmin();
   backupNow(workspaceId);
-  toast(`Freed up ${total}. The files are saved on this device.`);
+  toast(`Freed up ${total}. ${one ? "The file is" : "The files are"} saved on this device.`);
 }
 
 async function deleteFile(file) {

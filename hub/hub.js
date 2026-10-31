@@ -1002,7 +1002,54 @@ function messageNode(message, grouped, reactions) {
         ? el("button", { class: "text danger-text", type: "button", title: "Delete for everyone", onclick: runMessageAction(() => deleteMessage(message, file, true)) }, "Delete")
         : null,
   ];
-  actionsMenu.append(actionsButton, el("div", { class: "msg-actions", role: "group", "aria-label": "Message actions" }, ...actionItems));
+  const actionsPanel = el("div", { class: "msg-actions", role: "group", "aria-label": "Message actions" }, ...actionItems);
+  actionsMenu.append(actionsButton, actionsPanel);
+  const resetActionsPanel = () => {
+    window.removeEventListener("resize", placeActionsPanel);
+    document.removeEventListener("scroll", placeActionsPanel, true);
+    document.removeEventListener("pointerdown", closeActionsPanelOnOutside);
+    actionsPanel.classList.remove("is-floating");
+    for (const property of ["position", "left", "top", "right", "bottom", "visibility"]) actionsPanel.style.removeProperty(property);
+    actionsMenu.append(actionsPanel);
+  };
+  const closeActionsPanelOnOutside = (event) => {
+    if (!actionsMenu.contains(event.target) && !actionsPanel.contains(event.target)) actionsMenu.open = false;
+  };
+  const placeActionsPanel = () => {
+    if (!actionsMenu.open) return;
+    if (actionsPanel.parentElement !== document.body) document.body.append(actionsPanel);
+    actionsPanel.classList.add("is-floating");
+    Object.assign(actionsPanel.style, { position: "fixed", left: "8px", top: "8px", right: "auto", bottom: "auto", visibility: "hidden" });
+    const trigger = actionsButton.getBoundingClientRect();
+    const panel = actionsPanel.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const viewportLeft = viewport?.offsetLeft || 0;
+    const viewportTop = viewport?.offsetTop || 0;
+    const viewportWidth = viewport?.width || document.documentElement.clientWidth || window.innerWidth;
+    const viewportHeight = viewport?.height || document.documentElement.clientHeight || window.innerHeight;
+    const margin = 8;
+    const maxLeft = viewportLeft + viewportWidth - panel.width - margin;
+    const left = Math.max(viewportLeft + margin, Math.min(trigger.left, maxLeft));
+    const below = trigger.bottom + 6;
+    const above = trigger.top - panel.height - 6;
+    const maxTop = viewportTop + viewportHeight - panel.height - margin;
+    const top = below + panel.height <= viewportTop + viewportHeight - margin
+      ? below
+      : Math.max(viewportTop + margin, Math.min(above, maxTop));
+    actionsPanel.style.left = left + "px";
+    actionsPanel.style.top = top + "px";
+    actionsPanel.style.visibility = "visible";
+  };
+  actionsMenu.addEventListener("toggle", () => {
+    if (actionsMenu.open) {
+      window.addEventListener("resize", placeActionsPanel);
+      document.addEventListener("scroll", placeActionsPanel, true);
+      document.addEventListener("pointerdown", closeActionsPanelOnOutside);
+      requestAnimationFrame(placeActionsPanel);
+    } else {
+      resetActionsPanel();
+    }
+  });
   const ownMessage = message.user_id === state.user.id;
   const meta = grouped ? null : el("div", { class: "msg-meta" }, el("strong", { text: name }), el("time", { datetime: message.created_at, text: timeLabel(message.created_at) }));
   const content = el("div", { class: "msg-content" },

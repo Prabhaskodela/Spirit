@@ -27,7 +27,7 @@ function setBusy(isBusy) {
 function showSetupNote() {
   const note = $("#setup-note");
   note.hidden = false;
-  note.textContent = "Spirit’s screens are ready. Connect a Supabase project in app-config.js and apply schema.sql to enable Google sign-in and shared rooms.";
+  note.textContent = "SpiritHUB’s screens are ready. Connect a Supabase project in app-config.js and apply schema.sql to enable Google sign-in and shared rooms.";
   $("#google-sign-in").disabled = true;
   $("#google-sign-in").setAttribute("aria-describedby", "setup-note");
 }
@@ -394,7 +394,7 @@ async function exportRoomBackup() {
     }
     for (const memory of manifest.contents.memories) objects.set(`spirit-memories/${memory.storage_path}`, { bucket: "spirit-memories", path: memory.storage_path });
     const { zipSync, strToU8 } = await import("https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js");
-    const archive = { "spirit-manifest.json": strToU8(JSON.stringify(manifest, null, 2)) };
+    const archive = { "spirithub-manifest.json": strToU8(JSON.stringify(manifest, null, 2)) };
     for (const [archivePath, object] of objects) {
       const { data: signed, error } = await supabase.storage.from(object.bucket).createSignedUrl(object.path, 300);
       if (error) throw error;
@@ -406,7 +406,7 @@ async function exportRoomBackup() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${state.room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirit-backup.zip`;
+    link.download = `${state.room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirithub-backup.zip`;
     link.click();
     URL.revokeObjectURL(url);
     toast("Room backup downloaded.");
@@ -1339,7 +1339,7 @@ installButton.addEventListener("click", async () => {
 window.addEventListener("appinstalled", () => {
   pendingInstallPrompt = null;
   installButton.hidden = true;
-  toast("Spirit is installed.");
+  toast("SpiritHUB is installed.");
 });
 
 function updateOnlineState() {

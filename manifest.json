@@ -2,11 +2,17 @@
   "name": "SpiritHUB",
   "short_name": "SpiritHUB",
   "description": "SpiritHUB shared class rooms for subjects, files, chats, and memories.",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/Spirit/hub/",
+  "scope": "/Spirit/",
   "display": "standalone",
   "background_color": "#101116",
   "theme_color": "#101116",
-  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "icons": [
+    {
+      "src": "/Spirit/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
-

@@ -1283,3 +1283,9 @@ a,.link{color:#a7ddcb}
  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
+
+/* Keep the workspace logo on the unsemestered Chit Chat channel; subject channels retain their numbers. */
+.channel-link.chit-chat-link::before{content:none;display:none}
+.channel-group-logo{width:28px;height:28px;display:grid;place-items:center;overflow:hidden;border:1px solid #ffffff12;border-radius:9px;background:#ffffff05;color:#d3d9e6;font:600 10px/1 'Space Grotesk',sans-serif}
+.channel-group-logo .rail-photo,.channel-title .hash .rail-photo{width:100%;height:100%;border-radius:inherit;object-fit:cover}
+.channel-title .hash{overflow:hidden}

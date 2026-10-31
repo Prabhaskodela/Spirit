@@ -1316,7 +1316,7 @@ $("#account-name").addEventListener("click", () => {
 $("#account-name").setAttribute("title", "Click to edit your display name");
 
 if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register(new URL("./sw.js", window.location.href)).catch(() => {});
+  navigator.serviceWorker.register(new URL("/Spirit/sw.js", window.location.origin)).catch(() => {});
 }
 
 let pendingInstallPrompt = null;

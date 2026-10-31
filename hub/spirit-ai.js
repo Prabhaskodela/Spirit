@@ -56,8 +56,9 @@ function postWithProgress(url, accessToken, payload, signal, onProgress) {
     request.setRequestHeader("apikey", SUPABASE_ANON_KEY);
     request.setRequestHeader("Content-Type", "application/json");
     request.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+      if (event.lengthComputable) onProgress?.({ stage: "uploading", percent: Math.round(event.loaded / event.total * 100) });
     };
+    request.upload.onload = () => onProgress?.({ stage: "processing", percent: 100 });
     request.onerror = () => finish(reject, new Error("Couldn't upload the file. Check your connection and try again."));
     request.onabort = () => finish(reject, new Error("Spirit AI request was cancelled."));
     request.onload = () => {
@@ -102,9 +103,6 @@ export async function askSpiritAi(client, { workspaceId, prompt, history = [], f
     data.session.access_token,
     { workspaceId, prompt, history, attachment },
     signal,
-    (percent) => onProgress?.({ stage: "uploading", percent: Math.round(percent * 100) }),
-  ).then((text) => {
-    onProgress?.({ stage: "processing", percent: 100 });
-    return text;
-  });
+    (progress) => onProgress?.(progress),
+  );
 }

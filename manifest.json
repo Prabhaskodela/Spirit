@@ -1,7 +1,7 @@
 {
   "name": "SpiritHUB",
   "short_name": "SpiritHUB",
-  "description": "SpiritHUB shared class rooms for subjects, files, chats, and memories.",
+  "description": "A class collaboration space for semester subjects, files, conversations, and shared memories.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

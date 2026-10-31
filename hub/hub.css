@@ -553,3 +553,33 @@ a,.link{color:var(--mint)}code{background:#ffffff0d}
 
 /* SpiritHUB star mark replaces the generic channel dot */
 .channel-title .hash{color:#d3dda2;font-size:15px;text-shadow:0 0 12px #b9d28b40}
+
+/* Direct-message conversation layout */
+.messages{display:flex;flex-direction:column;align-items:center;gap:1px;padding:20px 0}
+.message:not(.grouped){margin-top:12px}
+.message{position:relative}
+.message:not(.own) .msg-main{width:min(100%,780px)}
+.message.own{
+  display:flex;flex-direction:column;align-items:flex-end;width:min(calc(100% - 48px),940px);
+  padding:3px 0;margin-inline:auto;
+}
+.message.own>.avatar,.message.own>.msg-time-gutter{display:none}
+.message.own>.msg-main{width:min(78%,720px);margin-left:auto;display:flex;flex-direction:column;align-items:flex-end}
+.message.own .msg-meta{justify-content:flex-end;width:100%;padding:0 5px}
+.message.own .msg-meta strong{display:none}
+.message.own .msg-meta time{color:#8f9e91;font-size:10px}
+.message .msg-body{width:fit-content;max-width:100%;padding:9px 13px;border:1px solid #ffffff0a;border-radius:5px 16px 16px 16px;background:#1a231e;color:#e8eee5;line-height:1.55}
+.message.own .msg-body{align-self:flex-end;border-color:#c5d99b38;border-radius:16px 16px 5px 16px;background:linear-gradient(145deg,#d5e3a5,#b9d28b);color:#1b251a;box-shadow:0 5px 16px #0002}
+.message .quote{max-width:100%;border:1px solid #ffffff10;border-radius:10px;background:#ffffff07;color:#b8c4b7}
+.message.own .quote{align-self:flex-end;border-color:#c5d99b30;background:#b9d28b16;color:#d5e3a5}
+.message .file-card{max-width:min(100%,560px)}
+.message.own .file-card{border-color:#c5d99b36;background:#1d2a20}
+.message .reactions{align-self:flex-start}
+.message.own .reactions{align-self:flex-end}
+.message.own .reaction.mine{border-color:#314a2d;background:#d5e3a5;color:#243321}
+.message.own .msg-actions{right:10px}
+@media(max-width:760px){
+  .message.own{width:calc(100% - 20px);padding-right:0}
+  .message.own>.msg-main{width:min(84%,560px)}
+  .message:not(.own) .msg-main{width:100%}
+}

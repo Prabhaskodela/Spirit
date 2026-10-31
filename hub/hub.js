@@ -560,7 +560,7 @@ function renderSidebar() {
       el("span", { class: "hash", text: "•" }),
       el("span", { class: "channel-label", text: channelDisplayName(channel.name) }),
       channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
-    admin ? rowActions([[`Edit ${channel.name}`, "✎", () => editChannel(channel)], [`Delete ${channel.name}`, "✕", () => deleteChannel(channel)]]) : null);
+    admin ? rowActions([[`Edit ${channelDisplayName(channel.name)}`, "✎", () => editChannel(channel)], [`Delete ${channelDisplayName(channel.name)}`, "✕", () => deleteChannel(channel)]]) : null);
   const tree = [];
   if (workspace) {
     tree.push(el("button", { class: `memories-link${state.view === "memories" ? " is-active" : ""}`, type: "button", onclick: openMemories },
@@ -751,7 +751,7 @@ function renderMessages(toBottom = false) {
   if (state.messages.length < PAGE_SIZE) {
     nodes.push(el("div", { class: "channel-intro" },
       el("div", { class: "intro-hash", text: "💬", "aria-hidden": "true" }),
-      el("h3", { text: `Welcome to ${state.channel.name}${state.channel.course_code ? ` · ${state.channel.course_code}` : ""}` }),
+      el("h3", { text: `Welcome to ${channelDisplayName(state.channel.name)}${state.channel.course_code ? ` · ${state.channel.course_code}` : ""}` }),
       el("p", { class: "muted", text: "Share notes, PDFs and screenshots here. Everyone in the workspace can see them, and anyone can save an AI summary of a file for the rest." })));
   }
   const reactionsByMessage = new Map();
@@ -777,7 +777,7 @@ function renderFiles() {
     event.target.value = "";
   } });
   $("files-view").replaceChildren(
-    el("div", { class: "files-top" }, el("h3", { text: `Files in ${state.channel.name}` }), el("label", { class: "btn primary small" }, "Upload", picker)),
+    el("div", { class: "files-top" }, el("h3", { text: `Files in ${channelDisplayName(state.channel.name)}` }), el("label", { class: "btn primary small" }, "Upload", picker)),
     state.files.length
       ? el("div", { class: "file-list" }, ...state.files.map((file) => fileCard(file, true)))
       : el("p", { class: "muted", text: "No files yet. Upload PDFs or screenshots, then summarize them with your local AI." }));
@@ -1025,7 +1025,7 @@ async function editChannel(channel) {
 }
 
 async function deleteChannel(channel) {
-  if (!(await ask({ title: `Delete ${channel.name}?`, body: "All its messages and files are deleted for everyone.", okLabel: "Delete", danger: true }))) return;
+  if (!(await ask({ title: `Delete ${channelDisplayName(channel.name)}?`, body: "All its messages and files are deleted for everyone.", okLabel: "Delete", danger: true }))) return;
   const paths = await filePaths((query) => query.eq("channel_id", channel.id));
   const result = await supabase.from("hub_channels").delete().eq("id", channel.id).select("id");
   if (failed(result, "Only admins can delete channels.")) return;
@@ -1983,7 +1983,7 @@ function renderAiView() {
   if (!channel) return;
   const caps = state.ai.caps;
   const readable = state.files.filter((file) => !file.archived_at);
-  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about ${channel.name}, or anything else…`, "aria-label": "Your question" });
+  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about ${channelDisplayName(channel.name)}, or anything else…`, "aria-label": "Your question" });
   const form = el("form", { class: "composer", onsubmit: (event) => {
     event.preventDefault();
     const question = input.value.trim();
@@ -1994,7 +1994,7 @@ function renderAiView() {
   $("ai-view").replaceChildren(
     el("div", { class: "ai-top" },
       el("div", {},
-        el("h3", { text: `Ask about ${channel.name}` }),
+        el("h3", { text: `Ask about ${channelDisplayName(channel.name)}` }),
         el("p", { class: "muted small", text: `Answers come from ${caps?.ok ? `${caps.model} on your laptop` : "your laptop's AI, which isn't connected yet"}. Only you see this chat, and it stays in this browser.` })),
       el("div", { class: "ai-top-actions" },
         caps?.ok ? null : el("button", { class: "btn small primary", type: "button", onclick: openAiSettings }, "Connect AI"),
@@ -2021,7 +2021,7 @@ function renderAiThread() {
     const node = el("div", { class: `ask-msg md${message.pending && message.text ? " is-streaming" : ""}`, html: message.text ? markdown(message.text) : '<span class="busy-dot"></span>' });
     if (!message.pending && !message.failed) {
       node.append(el("div", { class: "ask-actions" },
-        el("button", { class: "link", type: "button", onclick: () => shareAiAnswer(thread[index - 1]?.text, message.text) }, `Share in ${state.channel.name}`)));
+        el("button", { class: "link", type: "button", onclick: () => shareAiAnswer(thread[index - 1]?.text, message.text) }, `Share in ${channelDisplayName(state.channel.name)}`)));
     }
     return node;
   }));
@@ -2099,12 +2099,12 @@ function clearAiThread() {
 async function shareAiAnswer(question, answer) {
   const channel = state.channel;
   if (!channel) return;
-  if (!(await ask({ title: `Share this answer in ${channel.name}?`, body: "Everyone in the workspace will see it in the chat.", okLabel: "Share" }))) return;
+  if (!(await ask({ title: `Share this answer in ${channelDisplayName(channel.name)}?`, body: "Everyone in the workspace will see it in the chat.", okLabel: "Share" }))) return;
   const body = `🤖 AI answer${question ? ` to "${question.slice(0, 200)}"` : ""}:\n\n${answer}`.slice(0, 4000);
   const { data, error } = await supabase.from("hub_messages").insert({ workspace_id: state.workspace.id, channel_id: channel.id, body }).select().single();
   if (error) return toast(error.message);
   addMessage(data);
-  toast(`Shared in ${channel.name}`);
+  toast(`Shared in ${channelDisplayName(channel.name)}`);
 }
 
 /* ---------- Admin panel: everything this workspace keeps in Supabase ---------- */

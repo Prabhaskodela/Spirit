@@ -1322,16 +1322,31 @@ a,.link{color:#a7ddcb}
 
 
 /* Independent, cloud-backed workspace Spirit AI navigation. */
-.spirit-ai-free-label{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid #9ad9c433;border-radius:99px;background:#9ad9c40e;color:#a9e7cf;font-size:10px;font-weight:700;white-space:nowrap}
-.spirit-ai-disclosure{margin:0 16px 6px;padding:8px 10px;border:1px solid #9ad9c41c;border-radius:9px;background:#9ad9c408;color:#9ca9a2;font-size:11px;line-height:1.45}
-.spirit-ai-thread{min-height:120px}
-.spirit-ai-user{display:grid;gap:4px}
-.spirit-ai-attachment-name{color:#a9e7cf;font-size:11px;font-weight:600}
+.spirit-ai-link{position:relative;min-height:40px;padding:7px 10px;border:1px solid #ad91ff35;border-radius:10px;background:linear-gradient(115deg,#9b7af222,#61d8bd12);box-shadow:inset 0 1px 0 #ffffff0d,0 5px 14px #07070b35;color:#e5dcff;font-weight:650;transition:border-color .16s ease,background .16s ease,box-shadow .16s ease,transform .16s ease}
+.spirit-ai-link>span{width:25px;height:25px;display:grid;place-items:center;flex:0 0 auto;border:1px solid #bea8ff40;border-radius:8px;background:#b08bff20;color:#cbbcff;font-size:14px;line-height:1}
+.spirit-ai-link:hover{border-color:#b89dff70;background:linear-gradient(115deg,#a17cfb34,#71e5cb1c);box-shadow:inset 0 1px 0 #ffffff12,0 7px 18px #08070e52;color:#f7f3ff;transform:translateY(-1px)}
+.spirit-ai-link.is-active{border-color:#93e5d58a;background:linear-gradient(115deg,#a17cfb3d,#71e5cb27);box-shadow:inset 0 1px 0 #ffffff18,0 0 0 1px #75dfc21a,0 7px 20px #08070e55;color:#f4fffc}
+.spirit-ai-link.is-active>span{border-color:#8ce2d47d;background:linear-gradient(145deg,#a78bfa45,#66d7bc2e);color:#b9ffe9}
+.spirit-ai-link:focus-visible{outline:2px solid #a78bfa;outline-offset:2px}
+.spirit-ai-free-label{display:inline-flex;align-items:center;padding:3px 8px;border:1px solid #9ad9c455;border-radius:99px;background:linear-gradient(120deg,#9b7af21c,#61d8bd15);color:#baf3df;font-size:10px;font-weight:700;white-space:nowrap}
+.spirit-ai-view{background:linear-gradient(180deg,#9b7af20a,transparent 28%)}
+.spirit-ai-top{border-bottom:1px solid #a993ed1c}
+.spirit-ai-top h3{color:#e7dcff}
+.spirit-ai-disclosure{margin:0 16px 6px;padding:8px 10px;border:1px solid #9ad9c42b;border-left:2px solid #9a83e9;border-radius:8px;background:linear-gradient(105deg,#9b7af212,#61d8bd08);color:#bdc4c9;font-size:11px;line-height:1.5}
+.spirit-ai-thread{min-height:120px;gap:14px}
+.spirit-ai-user{display:grid;gap:4px;align-self:flex-end;border-color:#b7a1ff65;background:linear-gradient(135deg,#674cae99,#4b568a8c);box-shadow:0 7px 20px #08071248;color:#faf7ff;border-radius:16px 6px 16px 16px}
+.spirit-ai-answer{align-self:flex-start;border:1px solid #78d7bd4a;border-left:3px solid #7edbc2;border-radius:6px 16px 16px 16px;background:linear-gradient(145deg,#203b36,#24283a);box-shadow:0 8px 22px #080d1238;color:#edf8f4}
+.spirit-ai-answer a{color:#bdadff}
+.spirit-ai-answer pre{border:1px solid #8b7bd52e;border-radius:10px;background:#11151dcc}
+.spirit-ai-answer :not(pre)>code{border:1px solid #91ddc126;border-radius:5px;background:#75d6bd12;color:#c7f3e5}
+.spirit-ai-attachment-name{color:#c7f3e5;font-size:11px;font-weight:600}
 .spirit-ai-composer-wrap{flex:0 0 auto}
-.spirit-ai-file-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 16px 6px;padding:5px 8px;border:1px solid #9ad9c42b;border-radius:8px;background:#9ad9c40a;color:#c8ded4;font-size:11px}
-.spirit-ai-form{min-width:0}
-.spirit-ai-attach{flex:0 0 34px}
-.spirit-ai-form>input[type=text],.spirit-ai-form>input:not([type]){flex:1;min-width:0}
+.spirit-ai-file-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 16px 6px;padding:6px 9px;border:1px solid #8ddbc250;border-radius:9px;background:linear-gradient(110deg,#6ed6bc14,#9b7af211);color:#d8f3e9;font-size:11px}
+.spirit-ai-form{min-width:0;border-color:#a18ce43c;background:linear-gradient(110deg,#282535,#20262a)}
+.spirit-ai-form:focus-within{border-color:#93dec7a3;box-shadow:0 0 0 3px #80d7bd16}
+.spirit-ai-attach{flex:0 0 34px;background:linear-gradient(145deg,#b08bff2b,#63d7bc22);color:#d7caff}
+.spirit-ai-form .send{background:linear-gradient(135deg,#b59aff,#77dfc4);color:#19201e;box-shadow:0 4px 12px #70d9bf30}
+.spirit-ai-form .send:hover{filter:brightness(1.08)}
 @media(max-width:760px){
   .spirit-ai-disclosure{margin-inline:12px}
   .spirit-ai-file-row{margin-inline:12px}

@@ -1262,7 +1262,21 @@ async function openPdfViewer(storagePath, fileName) {
     const pdfjs = await (pdfJsPromise || (pdfJsPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs")));
     if (!dialog.open || requestId !== pdfViewerRequestId) return;
     pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
-    const pdf = await pdfjs.getDocument({ url: data.signedUrl }).promise;
+    let pdf;
+    try {
+      // URL loading uses byte-range requests; some Android Chrome/WebView builds
+      // fail those requests against signed Storage URLs. Keep that fast path first.
+      pdf = await pdfjs.getDocument({ url: data.signedUrl, isEvalSupported: false }).promise;
+    } catch (urlLoadError) {
+      console.warn("PDF URL/range loading failed; retrying with downloaded bytes", urlLoadError);
+      const response = await fetch(data.signedUrl, { cache: "no-store" });
+      if (!response.ok) throw new Error(`PDF download failed (${response.status}).`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length < 5 || new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") {
+        throw new Error("The stored attachment is not a valid PDF file.");
+      }
+      pdf = await pdfjs.getDocument({ data: bytes, isEvalSupported: false, useWorkerFetch: false }).promise;
+    }
     if (!dialog.open || requestId !== pdfViewerRequestId) { pdf.destroy(); return; }
     activePdfDocument = pdf;
     status.textContent = `${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"} · Scroll to read`;

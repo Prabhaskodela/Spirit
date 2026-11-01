@@ -2,10 +2,10 @@
 // Supabase is loaded from this site's own origin by index.html. A remote module import here could
 // leave the entire app waiting forever when a CDN is blocked or slow.
 const createClient = window.supabase?.createClient || null;
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
-import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
-import * as backup from "./backup.js";
-import { SPIRIT_AI_MAX_FILE_BYTES, spiritAiMimeType, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261101-spirit-ai-9";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js?v=20261102-startup-repair";
+import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js?v=20261102-startup-repair";
+import * as backup from "./backup.js?v=20261102-startup-repair";
+import { SPIRIT_AI_MAX_FILE_BYTES, spiritAiMimeType, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261102-startup-repair";
 
 const BUCKET = "hub-files";
 const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", "image/gif"];

@@ -23,3 +23,5 @@ jobs:
         run: |
           node --check sw.js
           node --check hub/sw.js
+      - name: Validate page templates, assets, manifests, and schema hooks
+        run: node scripts/validate.mjs

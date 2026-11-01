@@ -37,7 +37,7 @@ if (!html.includes("<title>Spirited Workspace</title>") || !html.includes('src="
 html = html
   .replace('<link rel="manifest" href="./manifest.json">', "")
   .replaceAll("20261101-profile-settings-2", "android-native-1");
-html = html.replace("</head>", '  <link rel="stylesheet" href="mobile-native.css">\\n</head>');
+html = html.replace("</head>", '  <link rel="stylesheet" href="mobile-native.css"></head>');
 await writeFile(htmlPath, html, "utf8");
 
 await build({

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve, sep } from "node:path";
+import { dirname, resolve } from "node:path";
 
 const read = (path) => readFileSync(path, "utf8");
 const app = read("app.js");
@@ -8,7 +8,7 @@ const schema = read("schema.sql");
 
 function inspectHtml(path, rootPrefix = "/Spirit/") {
   const html = read(path);
-  const ids = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map((match) => match[1]);
+  const ids = [...html.matchAll(/\b id=["']([^"']+)["']/g)].map((match) => match[1]);
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.deepEqual(duplicates, [], `${path} has duplicate element IDs`);
 
@@ -37,17 +37,17 @@ const generatedIds = new Set([
   "subject-chat-attachment",
   "current-files"
 ]);
-const staticSelectors = [...app.matchAll(/\\$\\(["']#([a-zA-Z0-9_-]+)["']\\)/g)].map((match) => match[1]);
+const staticSelectors = [...app.matchAll(/\$\(["']#([a-zA-Z0-9_-]+)["']\)/g)].map((match) => match[1]);
 const missing = [...new Set(staticSelectors.filter((id) => !rootIds.has(id) && !generatedIds.has(id)))];
 assert.deepEqual(missing, [], "app.js references IDs that are absent from both page templates");
 
 JSON.parse(read("manifest.json"));
 JSON.parse(read("hub/manifest.json"));
-assert.match(schema, /create trigger messages_room_quota before insert on public\\.messages/i);
-assert.match(schema, /create trigger subject_files_room_quota before insert on public\\.subject_files/i);
-assert.match(schema, /create trigger memories_room_quota before insert on public\\.memories/i);
-assert.match(schema, /storage\\.objects[\\s\\S]*spirit-files[\\s\\S]*spirit-memories/i);
+assert.match(schema, /create trigger messages_room_quota before insert on public\.messages/i);
+assert.match(schema, /create trigger subject_files_room_quota before insert on public\.subject_files/i);
+assert.match(schema, /create trigger memories_room_quota before insert on public\.memories/i);
+assert.match(schema, /storage\.objects[\s\S]*spirit-files[\s\S]*spirit-memories/i);
 assert.match(app, /createSignedUrl/);
 assert.match(app, /roomSelectionVersion/);
-assert.match(app, /file_size: file\\.size/);
+assert.match(app, /file_size: file\.size/);
 console.log("SpiritHUB static validation passed.");

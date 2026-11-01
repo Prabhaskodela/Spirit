@@ -590,7 +590,7 @@ async function openChannel(id) {
   renderHeader();
   const unreadMessageId = state.unreadMarker;
   if (unreadMessageId && $("messages").querySelector(`[data-id="${unreadMessageId}"]`)) jumpTo(unreadMessageId);
-  $("message-input").focus({ preventScroll: true });
+  $("message-input").blur();
   markChannelRead(id);
   updateSeenPresence();
 }

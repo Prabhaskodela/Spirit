@@ -1,34 +1,48 @@
-const CACHE_NAME = "spirithub-shell-v9";
-const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./app-config.js", "./manifest.json", "./logo.svg", "./spirit-wordmark.png", "./icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-512-maskable.png"];
+// SpiritHUB Workspaces service worker.
+const CACHE_NAME = "spirithub-shell-v5";
+const APP_SHELL = new URL("./", self.location.href).href;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    try { await cache.add(new Request(APP_SHELL, { cache: "reload" })); } catch {}
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => /^(spirit|spirithub)-shell-/.test(key) && key !== CACHE_NAME).map((key) => caches.delete(key)))).then(() => self.clients.claim()));
+  event.waitUntil((async () => {
+    // Remove old app caches so stale pages from either former entry point cannot take over.
+    const oldCaches = (await caches.keys())
+      .filter((name) => /^(spirit|spirithub)-shell-/.test(name) && name !== CACHE_NAME);
+    await Promise.all(oldCaches.map((name) => caches.delete(name)));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
+  if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) return;
+
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  const appRoot = new URL("./", self.location.href).pathname;
+  if (!url.pathname.startsWith(appRoot)) return;
 
-  if (request.mode === "navigate") {
-    event.respondWith(fetch(request).then((response) => {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    try {
+      const response = await fetch(request);
+      if (response.ok && response.type === "basic") {
+        await cache.put(request, response.clone());
+      }
       return response;
-    }).catch(() => caches.match("./index.html")));
-    return;
-  }
-
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-    if (response.ok) {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+    } catch {
+      const cached = await cache.match(request, { ignoreSearch: true });
+      if (cached) return cached;
+      if (request.mode === "navigate") {
+        return (await cache.match(APP_SHELL)) || Response.error();
+      }
+      return Response.error();
     }
-    return response;
-  })));
+  })());
 });
-

@@ -1,27 +1,33 @@
-name: Build SpiritHUB Hub Android app
+name: Build SpiritHUB Android app
 
 on:
   workflow_dispatch:
   pull_request:
-    branches: [main]
     paths:
-      - "app-config.js"
+      - "index.html"
       - "app.js"
-      - "styles.css"
-      - "hub/**"
-      - "icons/**"
-      - "spirit-wordmark.png"
+      - "app.css"
+      - "premium.css"
+      - "ai.js"
+      - "backup.js"
+      - "spirit-ai.js"
+      - "config.js"
+      - "manifest.json"
+      - "assets/**"
       - "mobile/**"
       - ".github/workflows/android-app.yml"
   push:
-    branches: [main]
     paths:
-      - "app-config.js"
+      - "index.html"
       - "app.js"
-      - "styles.css"
-      - "hub/**"
-      - "icons/**"
-      - "spirit-wordmark.png"
+      - "app.css"
+      - "premium.css"
+      - "ai.js"
+      - "backup.js"
+      - "spirit-ai.js"
+      - "config.js"
+      - "manifest.json"
+      - "assets/**"
       - "mobile/**"
       - ".github/workflows/android-app.yml"
 
@@ -49,27 +55,16 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
-      - name: Build the packaged /hub/ app
+      - name: Build the packaged app
         working-directory: mobile
         run: |
           npm ci
-          npm install-scripts approve esbuild
-          node --check scripts/build-web.mjs
           npm run build:web
-          npx esbuild native-runtime-entry.js --bundle --format=esm --platform=browser --target=es2020 --outfile=www/native-runtime.js
-          test -f www/index.html
-          grep -q 'class="hub-route"' www/index.html
-          grep -q 'src="./app.js' www/index.html
-          grep -q 'href="./styles.css' www/index.html
           npx cap sync android
           cd android
           ./gradlew assembleDebug --no-daemon
-          cd ..
-          cp android/app/build/outputs/apk/debug/app-debug.apk "Spirit hub Finalised.apk"
-          test -s "Spirit hub Finalised.apk"
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: Spirit hub Finalised
-          path: mobile/Spirit hub Finalised.apk
-          if-no-files-found: error
+          name: spirithub-android-debug-apk
+          path: mobile/android/app/build/

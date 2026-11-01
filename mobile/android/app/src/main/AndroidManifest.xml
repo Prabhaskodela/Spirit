@@ -15,7 +15,6 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>
@@ -45,5 +44,4 @@
 
     <!-- Permissions -->
 
-    <uses-permission android:name="android.permission.INTERNET" />
-</manifest>
+    <uses-permission android:name=

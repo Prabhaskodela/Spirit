@@ -53,6 +53,8 @@ jobs:
         working-directory: mobile
         run: |
           npm ci
+          npm install-scripts approve esbuild
+          node --check scripts/build-web.mjs
           npm run build:web
           test -f www/index.html
           grep -q 'class="hub-route"' www/index.html

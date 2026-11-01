@@ -14,7 +14,7 @@ The layout adapts to desktop, tablet, and phone screens. The web manifest and se
 ## Setup outline
 
 1. Create a Supabase project on the Free plan.
-2. Run `schema.sql` in Supabase SQL Editor.
+2. Run `schema.sql` in Supabase SQL Editor. If your Supabase database already exists from an earlier version, also run `migrations/20261101_room_chat_gif_quota.sql` once.
 3. Enable Google in Supabase Authentication and configure the OAuth client using Supabase's Google sign-in guide.
 4. Add the production site URL and local development URL to Supabase's allowed redirect URLs.
 5. Copy the project URL and public anon/publishable key into `app-config.js`.

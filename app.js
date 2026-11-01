@@ -3532,11 +3532,26 @@ if (!configured) {
 } else {
   if (!readInviteFromUrl()) state.invite = session.get(INVITE_KEY);
   let sessionQueue = Promise.resolve();
-  supabase.auth.onAuthStateChange((event, current) => {
-    // Supabase runs this while holding its auth lock; queue our queries for afterwards, one session change at a time.
+  let queuedSessionId;
+  const queueSession = (current) => {
+    const user = current?.user || null;
+    const userId = user?.id || null;
+    if (userId === queuedSessionId) return;
+    queuedSessionId = userId;
+    // Supabase runs auth callbacks while holding its auth lock; queue our queries for afterwards.
     setTimeout(() => {
-      sessionQueue = sessionQueue.then(() => handleSession(current?.user || null));
+      sessionQueue = sessionQueue.then(() => handleSession(user));
     }, 0);
+  };
+  supabase.auth.onAuthStateChange((_event, current) => queueSession(current));
+  // Explicitly read the saved session as a fallback in case INITIAL_SESSION is delayed or missed.
+  void supabase.auth.getSession().then(({ data, error }) => {
+    if (error) throw error;
+    queueSession(data?.session || null);
+  }).catch((error) => {
+    console.error("Spirit workspace could not read its saved session", error);
+    if (!state.user) showAuth();
+    authMessage(friendlyAuthError(error));
   });
   if (isNativeAndroid) {
     void nativeRuntimePromise.then(async ({ App }) => {

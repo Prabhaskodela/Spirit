@@ -35,7 +35,7 @@ let html = await readFile(htmlPath, "utf8");
 html = html
   .replaceAll("/Spirit/", "./")
   .replace(/^[ \\t]*<link rel="manifest" href="\\.\\/manifest\\.json">[ \\t]*\\r?\\n/m, "");
-await writeFile(htmlPath, html, "utf8");
+  .replace(/^[ \t]*<link rel="manifest" href="\.\/manifest\.json">[ \t]*\r?\n/m, "");
 
 await build({
   entryPoints: [resolve(mobileDir, "native-runtime-entry.js")],

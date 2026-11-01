@@ -8,7 +8,7 @@ const schema = read("supabase/schema.sql");
 
 function inspectHtml(path) {
   const html = read(path);
-  const ids = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map((match) => match[1]);
+  const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.deepEqual(duplicates, [], path + " has duplicate element IDs");
 
@@ -17,7 +17,7 @@ function inspectHtml(path) {
     if (/^(?:https?:|data:|#|mailto:|tel:|javascript:)/i.test(value)) continue;
     const withoutQuery = value.split(/[?#]/)[0];
     const localPath = withoutQuery.startsWith("/")
-      ? withoutQuery.replace(/^\\/+/, "")
+      ? withoutQuery.replace(/^\/+/, "")
       : resolve(dirname(path), withoutQuery);
     assert.ok(existsSync(localPath), path + " references missing local asset: " + value);
   }
@@ -25,17 +25,17 @@ function inspectHtml(path) {
 }
 
 const { html, ids } = inspectHtml("index.html");
-const staticSelectors = [...app.matchAll(/\\$\\(["']#([a-zA-Z0-9_-]+)["']\\)/g)].map((match) => match[1]);
+const staticSelectors = [...app.matchAll(/\$\(["']#([a-zA-Z0-9_-]+)["']\)/g)].map((match) => match[1]);
 const generatedIds = new Set(["message-list", "file-list", "channel-list", "workspace-list"]);
 const missing = [...new Set(staticSelectors.filter((id) => !ids.has(id) && !generatedIds.has(id)))];
 assert.deepEqual(missing, [], "app.js references IDs absent from the root page");
 
 const redirect = read("hub/index.html");
-assert.match(redirect, /location\\.replace\\(destination\\.href\\)/, "legacy /hub/ URL must redirect to the root app");
-assert.match(redirect, /destination\\.search = location\\.search/, "legacy redirect must preserve query parameters");
+assert.match(redirect, /location\.replace\(destination\.href\)/, "legacy /hub/ URL must redirect to the root app");
+assert.match(redirect, /destination\.search = location\.search/, "legacy redirect must preserve query parameters");
 JSON.parse(read("manifest.json"));
 assert.match(html, /Spirited Workspace/);
-assert.match(html, /spirited-workspace-logo|assets\\/icons/);
+assert.match(html, /spirited-workspace-logo|assets\/icons/);
 for (const table of ["hub_profiles", "hub_workspaces", "hub_members", "hub_channels", "hub_files", "hub_messages"]) {
   assert.match(schema, new RegExp("create table(?: if not exists)? public\\." + table + "\\b", "i"), "schema must define public." + table);
 }

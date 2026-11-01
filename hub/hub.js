@@ -1827,7 +1827,7 @@ function setBackupStatus(workspaceId, text, problem = false) {
 
 async function showBackupStatus(workspaceId, record) {
   record ||= await backup.syncRecord(workspaceId).catch(() => null);
-  if (!record?.synced_at) return setBackupStatus(workspaceId, "Backing up on this device…");
+  if (!record?.synced_at) return setBackupStatus(workspaceId, isMobileClient() ? "Tap to back up on this device" : "Backing up on this device…");
   const when = new Date(record.synced_at).toDateString() === new Date().toDateString()
     ? shortTime(record.synced_at)
     : new Date(record.synced_at).toLocaleDateString([], { day: "numeric", month: "short" });
@@ -1842,7 +1842,7 @@ async function openBackup() {
   const record = await backup.syncRecord(workspace.id).catch(() => null);
   const persisted = await navigator.storage?.persisted?.().catch(() => false);
   const body = el("div", { class: "backup-info" },
-    el("p", { text: `SpiritHUB keeps a copy of ${workspace.name} in this browser and updates it every few minutes while it's open: messages, files and Memories photos. Files an admin moves off the online storage still open from here.` }),
+    el("p", { text: `SpiritHUB keeps a copy of ${workspace.name} in this browser. On this phone, tap the backup button when you want to save messages, files and Memories photos. Files an admin moves off the online storage still open from here.` }),
     el("p", { class: "muted", text: record?.synced_at
       ? `${countOf(record.messages, "message")}, ${countOf(record.files, "file")} and ${countOf(record.photos, "photo")} (${record.bytes ? formatSize(record.bytes) : "0 MB"}) · updated ${timeLabel(record.synced_at)}`
       : "The first backup is still running." }),

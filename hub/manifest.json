@@ -1,6 +1,6 @@
 {
-  "name": "SpiritHUB",
-  "short_name": "SpiritHUB",
+  "name": "Spirited Workspace",
+  "short_name": "Spirited Workspace",
   "description": "A shared class space for subjects, files, conversations, and semester memories.",
   "start_url": "/Spirit/hub/",
   "scope": "/Spirit/hub/",

@@ -1248,10 +1248,20 @@ async function openPdfViewer(storagePath, fileName) {
     const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600);
     if (error || !data?.signedUrl) throw error || new Error("Could not create a secure PDF link.");
     if (!dialog.open || requestId !== pdfViewerRequestId) return;
-    // Keep a native-browser route available on iOS/Android if PDF.js or its worker cannot start.
-    openNative.href = data.signedUrl;
-    openNative.setAttribute("aria-label", `Open ${fileName || "PDF"} in the browser`);
+    // Android Chrome's built-in PDF tab can remain blank for signed Storage URLs
+    // served inline. Request an attachment with the original filename instead, so
+    // Chrome downloads a correctly named PDF that the phone's PDF app can open.
     const { data: downloadData, error: downloadError } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600, { download: fileName || "document.pdf" });
+    const androidChrome = /Android/i.test(navigator.userAgent) && /Chrome\//i.test(navigator.userAgent);
+    openNative.href = androidChrome && downloadData?.signedUrl ? downloadData.signedUrl : data.signedUrl;
+    openNative.setAttribute("aria-label", androidChrome ? `Download ${fileName || "PDF"} to open on your phone` : `Open ${fileName || "PDF"} in the browser`);
+    if (androidChrome) {
+      openNative.textContent = "Download to open";
+      openNative.removeAttribute("target");
+    } else {
+      openNative.textContent = "Open PDF";
+      openNative.setAttribute("target", "_blank");
+    }
     if (downloadData?.signedUrl) download.href = downloadData.signedUrl;
     else {
       download.href = data.signedUrl;

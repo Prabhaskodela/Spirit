@@ -3573,3 +3573,4 @@ if (!configured) {
 
 
 window.spiritAppReady = true;
+if ($("auth-error").textContent.startsWith("The workspace is taking longer")) authMessage("");

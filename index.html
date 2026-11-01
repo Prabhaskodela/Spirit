@@ -17,7 +17,9 @@
         auth.hidden = false;
         const error = document.getElementById("auth-error");
         error.hidden = false;
-        error.textContent = "The workspace is taking longer than expected to start. Refresh this page to try again.";
+        error.textContent = window.spiritStartupError
+          ? `Workspace startup failed: ${window.spiritStartupError} Refresh this page to try again.`
+          : "The workspace is taking longer than expected to start. Refresh this page to try again.";
         document.getElementById("auth-form")?.addEventListener("submit", (event) => {
           if (window.spiritAppReady) return;
           event.preventDefault();
@@ -27,6 +29,26 @@
       screen.classList.add("is-done");
       window.setTimeout(() => screen.remove(), 500);
     };
+    window.reportSpiritStartupError = (error) => {
+      if (window.spiritAppReady) return;
+      const detail = error?.message || String(error || "Unknown startup error");
+      window.spiritStartupError = detail;
+      const auth = document.getElementById("auth");
+      const note = document.getElementById("auth-error");
+      if (!auth || !note) return;
+      auth.hidden = false;
+      note.hidden = false;
+      note.textContent = `Workspace startup failed: ${detail} Refresh this page to try again.`;
+      window.finishSpiritBoot();
+    };
+    window.addEventListener("error", (event) => {
+      if (event.filename || event.target instanceof HTMLScriptElement) {
+        window.reportSpiritStartupError(event.message || "A required app script could not load.");
+      }
+    }, true);
+    window.addEventListener("unhandledrejection", (event) => {
+      window.reportSpiritStartupError(event.reason);
+    });
     window.addEventListener("load", () => window.setTimeout(window.finishSpiritBoot, 3000), { once: true });
     window.setTimeout(window.finishSpiritBoot, 6000);
   </script>

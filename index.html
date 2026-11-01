@@ -54,15 +54,15 @@
     window.setTimeout(window.finishSpiritBoot, 6000);
   </script>
   <link rel="manifest" href="./manifest.json">
-  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
-  <link rel="icon" href="assets/icons/icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="assets/spirited-workspace-logo.png">
+  <link rel="icon" href="assets/spirited-workspace-logo.png" type="image/png" sizes="192x192">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="app.css?v=20261102-brand">
-  <link rel="stylesheet" href="premium.css?v=20261101-mobile-fix-1">
-  <script src="vendor/supabase-2.117.3.min.js?v=20261102-local-client"></script>
-  <script type="module" src="app.js?v=20261102-startup-repair"></script>
+  <link rel="stylesheet" href="app.css?v=20261102-logo-nav-cleanup">
+  <link rel="stylesheet" href="premium.css?v=20261102-logo-nav-cleanup">
+  <script src="vendor/supabase-2.117.3.min.js?v=20261102-logo-nav-cleanup"></script>
+  <script type="module" src="app.js?v=20261102-logo-nav-cleanup"></script>
   <script>
     // Register at the app root so the installed web app and its cache share one canonical URL.
     if (!navigator.userAgent.includes("SpiritHUBAndroid") && "serviceWorker" in navigator && location.protocol === "https:") {
@@ -80,7 +80,7 @@
   </div>
   <section class="center-screen" id="setup" hidden>
     <div class="card">
-      <div class="brand"><img class="brand-wordmark" src="assets/spirited-workspace-logo.svg" alt="Spirited Workspace"></div>
+      <div class="brand"><img class="brand-wordmark" src="assets/spirited-workspace-logo.png" alt="Spirited Workspace"></div>
       <h1>Connect your Supabase project</h1>
       <ol class="steps">
         <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>.</li>
@@ -93,7 +93,7 @@
 
   <section class="center-screen" id="auth" hidden>
     <form class="card auth-card" id="auth-form">
-      <div class="brand"><img class="brand-wordmark" src="assets/spirited-workspace-logo.svg" alt="Spirited Workspace"></div>
+      <div class="brand"><img class="brand-wordmark" src="assets/spirited-workspace-logo.png" alt="Spirited Workspace"></div>
       <p class="invite-note" id="invite-note" hidden></p>
       <h1 id="auth-title">Welcome back</h1>
       <p class="muted" id="auth-sub">Sign in to your workspaces.</p>
@@ -111,8 +111,8 @@
   <div class="app" id="app" hidden>
     <div class="nav" id="nav">
     <div class="nav-brand" aria-label="Spirited Workspace">
-      <img src="assets/icons/icon-192.png" alt="">
-      <span class="nav-brand-copy"><strong>Spirited Workspace</strong><small>YOUR LEARNING SPACE</small></span>
+      <img src="assets/spirited-workspace-logo.png" alt="">
+      <span class="nav-brand-copy"><strong>Spirited Workspace</strong></span>
     </div>
       <nav class="rail" aria-label="Workspaces">
         <div class="rail-list" id="rail-list"></div>

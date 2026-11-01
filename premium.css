@@ -956,4 +956,11 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
 .msg-menu>.msg-actions button.danger-text{color:#e6a19b}
 .msg-menu>.msg-actions button.danger-text:hover{background:#e88e8318;color:#ffc0b6}
 .message.own>.msg-menu{right:10px}
-@media(max-width:640px){
+@media(max-width:640px){
+}
+
+/* Use the submitted square logo throughout the website and keep sidebar utilities out of the way. */
+.brand-wordmark{width:112px;height:112px;max-height:none;object-fit:cover;border-radius:18px}
+.nav-brand-copy{gap:0}
+#storage-label,#storage-meter,#backup-status{display:none!important}
+.storage{gap:0;padding:0;border:0}

@@ -536,7 +536,7 @@ async function openWorkspace(id) {
   refreshStorage();
   subscribeWorkspace(id);
   showBackupStatus(id);
-  if (!isMobileClient()) setTimeout(() => backupNow(id), 2000); // phones back up only when the user asks
+  setTimeout(() => backupNow(id), 2000); // keep this device's backup current without a sidebar button
   const channel = state.channels.find((candidate) => candidate.id === last.channels?.[id]) || orderedChannels()[0];
   if (channel) await openChannel(channel.id);
   else showEmpty("channel");

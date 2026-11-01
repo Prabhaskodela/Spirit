@@ -291,4 +291,18 @@ export async function summarizeFile(file, options) {
   if (!options.caps.vision) throw new Error(`${options.settings.model} can't read images. Use a vision model such as qwen3.5:4b.`);
   if (content.images.length === 1) {
     const what = file.type === "application/pdf" ? `a scanned page from "${file.name}"` : `a screenshot a student shared ("${file.name}")`;
-    return chat(options, [{ role: "system", content: SYSTEM }, userMessage(`This is ${what}. Summarize what it shows.\n\n${IMAGE_FORMAT}`, conte
+    return chat(options, [
+      { role: "system", content: SYSTEM },
+      userMessage(`This is ${what}. Summarize what it shows.\n\n${IMAGE_FORMAT}`, [content.images[0]]),
+    ], 700);
+  }
+  const used = content.images.slice(0, MAX_PARTS);
+  const inputs = used.map((image, index) => userMessage(
+    `This is page ${index + 1} of ${used.length} from "${file.name}". Summarize the important text, ideas or instructions on this page in 3–6 short bullet notes. Mention any code and what it does.`,
+    [image],
+  ));
+  const summary = await notesThenMerge(file.name, inputs, "Reading page", options);
+  return content.images.length > MAX_PARTS
+    ? `${summary}\n\n*This covers the first ${MAX_PARTS} of ${content.images.length} pages.*`
+    : summary;
+}

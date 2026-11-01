@@ -17,8 +17,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check app JavaScript syntax
-        run: node --input-type=module --check < app.js
+      - name: Check website JavaScript syntax
+        run: |
+          for file in app.js ai.js backup.js spirit-ai.js config.js; do
+            node --input-type=module --check < "$file"
+          done
       - name: Check service worker syntax
         run: |
           node --check sw.js

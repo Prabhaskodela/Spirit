@@ -241,6 +241,22 @@ function friendlyAuthError(error) {
 
 $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "signin" ? "signup" : "signin"));
 
+$("google-sign-in").addEventListener("click", async () => {
+  const button = $("google-sign-in");
+  button.disabled = true;
+  authMessage("");
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${location.origin}${location.pathname}${location.search}` },
+    });
+    if (error) throw error;
+  } catch (error) {
+    authMessage(friendlyAuthError(error));
+    button.disabled = false;
+  }
+});
+
 $("auth-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const email = $("auth-email").value.trim();

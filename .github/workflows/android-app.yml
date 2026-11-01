@@ -1,4 +1,4 @@
-name: Build SpiritHUB Android app
+name: Build SpiritHUB Hub Android app
 
 on:
   workflow_dispatch:
@@ -7,7 +7,6 @@ on:
     paths:
       - "app-config.js"
       - "app.js"
-      - "index.html"
       - "styles.css"
       - "hub/**"
       - "icons/**"
@@ -19,7 +18,6 @@ on:
     paths:
       - "app-config.js"
       - "app.js"
-      - "index.html"
       - "styles.css"
       - "hub/**"
       - "icons/**"
@@ -51,17 +49,24 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
-      - name: Build the packaged app
+      - name: Build the packaged /hub/ app
         working-directory: mobile
         run: |
           npm ci
           npm run build:web
+          test -f www/index.html
+          grep -q 'class="hub-route"' www/index.html
+          grep -q 'src="./app.js' www/index.html
+          grep -q 'href="./styles.css' www/index.html
           npx cap sync android
           cd android
           ./gradlew assembleDebug --no-daemon
+          cd ..
+          cp android/app/build/outputs/apk/debug/app-debug.apk "Spirit hub Finalised.apk"
+          test -s "Spirit hub Finalised.apk"
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: spirithub-android-debug-apk
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: Spirit hub Finalised
+          path: mobile/Spirit hub Finalised.apk
           if-no-files-found: error

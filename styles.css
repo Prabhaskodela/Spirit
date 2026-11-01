@@ -304,3 +304,75 @@ button, input, select, textarea, a, label { touch-action: manipulation; }
   .chat-tools { gap: 3px; }
   .chat-tool, .send-button { width: 36px; flex-basis: 36px; }
 }
+
+
+/* /hub mobile chat keyboard layout: keep the composer docked above the Android IME. */
+@media (max-width: 620px) {
+  html, body {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  body {
+    height: var(--app-height, 100dvh);
+  }
+  .app-frame {
+    height: var(--app-height, 100dvh);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .workspace {
+    flex: 1 1 0;
+    height: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .room-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  #room-content:not([hidden]) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .room-heading,
+  .room-tabs,
+  .chat-section > .section-top {
+    flex: 0 0 auto;
+  }
+  #chat-section:not([hidden]) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .chat-box {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+  .message-list {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .chat-form {
+    flex: 0 0 auto;
+    padding-bottom: max(9px, env(safe-area-inset-bottom));
+  }
+  .app-footer {
+    flex: 0 0 auto;
+  }
+}

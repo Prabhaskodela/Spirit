@@ -308,26 +308,26 @@ button, input, select, textarea, a, label { touch-action: manipulation; }
 
 /* /hub mobile chat keyboard layout: keep the composer docked above the Android IME. */
 @media (max-width: 620px) {
-  html, body {
+  html:has(body.hub-route) {
     height: 100%;
-    min-height: 0;
-    overflow: hidden;
   }
-  body {
-    height: var(--app-height, 100dvh);
-  }
-  .app-frame {
+  body.hub-route {
     height: var(--app-height, 100dvh);
     min-height: 0;
     overflow: hidden;
   }
-  .workspace {
+  body.hub-route .app-frame {
+    height: var(--app-height, 100dvh);
+    min-height: 0;
+    overflow: hidden;
+  }
+  body.hub-route .workspace {
     flex: 1 1 0;
     height: 0;
     min-height: 0;
     overflow: hidden;
   }
-  .room-main {
+  body.hub-route .room-main {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
@@ -337,24 +337,24 @@ button, input, select, textarea, a, label { touch-action: manipulation; }
     padding-top: 12px;
     padding-bottom: 12px;
   }
-  #room-content:not([hidden]) {
+  body.hub-route #room-content:not([hidden]) {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
     min-height: 0;
   }
-  .room-heading,
-  .room-tabs,
-  .chat-section > .section-top {
+  body.hub-route .room-heading,
+  body.hub-route .room-tabs,
+  body.hub-route .chat-section > .section-top {
     flex: 0 0 auto;
   }
-  #chat-section:not([hidden]) {
+  body.hub-route #chat-section:not([hidden]) {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
     min-height: 0;
   }
-  .chat-box {
+  body.hub-route .chat-box {
     display: flex;
     flex: 1 1 0;
     flex-direction: column;
@@ -362,17 +362,17 @@ button, input, select, textarea, a, label { touch-action: manipulation; }
     min-height: 0;
     max-height: none;
   }
-  .message-list {
+  body.hub-route .message-list {
     flex: 1 1 0;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
-  .chat-form {
+  body.hub-route .chat-form {
     flex: 0 0 auto;
     padding-bottom: max(9px, env(safe-area-inset-bottom));
   }
-  .app-footer {
+  body.hub-route .app-footer {
     flex: 0 0 auto;
   }
 }

@@ -56,6 +56,7 @@ jobs:
           npm install-scripts approve esbuild
           node --check scripts/build-web.mjs
           npm run build:web
+          npx esbuild native-runtime-entry.js --bundle --format=esm --platform=browser --target=es2020 --outfile=www/native-runtime.js
           test -f www/index.html
           grep -q 'class="hub-route"' www/index.html
           grep -q 'src="./app.js' www/index.html

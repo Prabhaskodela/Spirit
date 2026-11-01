@@ -27,6 +27,7 @@ let semestersLoadVersion = 0;
 let subjectsLoadVersion = 0;
 let subjectFilesLoadVersion = 0;
 let roomsLoadVersion = 0;
+let memberListLoadVersion = 0;
 let authHandledUserId;
 
 function scheduleRefresh(callback, kind) {
@@ -118,7 +119,7 @@ async function clearRealtimeChannels() {
   state.chatChannel = null;
   state.subjectChatChannel = null;
   notificationChannel = null;
-  await Promise.all(channels.map((channel) => supabase.removeChannel(channel)));
+  await Promise.allSettled(channels.map((channel) => supabase.removeChannel(channel)));
   roomChatLoadVersion++;
   subjectChatLoadVersion++;
   memoriesLoadVersion++;
@@ -142,6 +143,7 @@ function showSignedOut() {
   $("#auth-screen").hidden = false;
   $("#workspace").hidden = true;
   $("#account-area").hidden = true;
+  document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
 }
 
 async function onSignedIn(expectedUserId = state.user?.id) {
@@ -472,10 +474,11 @@ async function exportRoomBackup() {
   if (!state.room) return;
   setBusy(true);
   try {
+    const room = { ...state.room };
     const tables = ["semesters", "subject_files", "subject_messages", "messages", "memories"];
-    const manifest = { exported_at: new Date().toISOString(), room: { id: state.room.id, name: state.room.name, academic_year: state.room.academic_year, room_code: state.room.room_code }, contents: {} };
+    const manifest = { exported_at: new Date().toISOString(), room: { id: room.id, name: room.name, academic_year: room.academic_year, room_code: room.room_code }, contents: {} };
     for (const table of tables) {
-      const { data, error } = await supabase.from(table).select("*").eq("room_id", state.room.id);
+      const { data, error } = await supabase.from(table).select("*").eq("room_id", room.id);
       if (error) throw error;
       manifest.contents[table] = data || [];
     }
@@ -504,7 +507,7 @@ async function exportRoomBackup() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${state.room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirithub-backup.zip`;
+    link.download = `${room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirithub-backup.zip`;
     link.click();
     // Let mobile browsers begin reading the generated archive before releasing its URL.
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -552,11 +555,16 @@ $("#manage-members").addEventListener("click", async () => {
 });
 
 async function loadMembers() {
+  if (!state.room) return;
+  const roomId = state.room.id;
+  const loadVersion = ++memberListLoadVersion;
   const list = $("#member-list");
   list.replaceChildren();
-  const { data: memberships, error } = await supabase.from("room_members").select("user_id,role,joined_at").eq("room_id", state.room.id).order("joined_at");
+  const { data: memberships, error } = await supabase.from("room_members").select("user_id,role,joined_at").eq("room_id", roomId).order("joined_at");
+  if (state.room?.id !== roomId || loadVersion !== memberListLoadVersion || !list.isConnected) return;
   if (error) return toast(error.message);
   const names = await loadProfiles((memberships || []).map((member) => member.user_id));
+  if (state.room?.id !== roomId || loadVersion !== memberListLoadVersion || !list.isConnected) return;
   for (const member of memberships || []) {
     const row = document.createElement("div");
     row.className = "member-row";
@@ -578,10 +586,14 @@ async function loadMembers() {
       remove.textContent = "Remove";
       remove.addEventListener("click", async () => {
         if (!confirm(`Remove ${name} from this room? They will lose access to its shared content.`)) return;
-        const { error: removeError } = await supabase.from("room_members").delete().eq("room_id", state.room.id).eq("user_id", member.user_id);
+        const roomId = state.room?.id;
+        if (!roomId) return;
+        const { error: removeError } = await supabase.from("room_members").delete().eq("room_id", roomId).eq("user_id", member.user_id);
         if (removeError) return toast(removeError.message);
-        await loadMembers();
-        await loadMemberCount();
+        if (state.room?.id === roomId) {
+          await loadMembers();
+          await loadMemberCount();
+        }
         toast("Member removed from this room.");
       });
       row.append(remove);
@@ -608,18 +620,23 @@ $("#manage-semester").addEventListener("click", () => {
 });
 
 async function renameSemester(name) {
-  if (!name || !state.semester) return;
-  const { error } = await supabase.from("semesters").update({ name }).eq("id", state.semester.id);
+  if (!name || !state.semester || state.role !== "admin") return;
+  const semesterId = state.semester.id;
+  const roomId = state.room?.id;
+  const { error } = await supabase.from("semesters").update({ name }).eq("id", semesterId);
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId) return;
   state.semester.name = name;
   await loadSemesters(name);
   toast("Semester renamed.");
 }
 
 async function deleteSemester() {
-  if (!state.semester || state.role !== "admin") return;
-  if (!confirm(`Delete ${state.semester.name}, all its subjects, chats, and files? This cannot be undone.`)) return;
-  const { data: subjects, error: subjectError } = await supabase.from("subjects").select("id").eq("semester_id", state.semester.id);
+  if (!state.semester || state.role !== "admin" || !state.room) return;
+  const semester = { ...state.semester };
+  const roomId = state.room.id;
+  if (!confirm(`Delete ${semester.name}, all its subjects, chats, and files? This cannot be undone.`)) return;
+  const { data: subjects, error: subjectError } = await supabase.from("subjects").select("id").eq("semester_id", semester.id);
   if (subjectError) return toast(subjectError.message);
   const ids = (subjects || []).map((item) => item.id);
   let paths = [];
@@ -634,11 +651,13 @@ async function deleteSemester() {
     const { error } = await supabase.storage.from("spirit-files").remove(paths);
     if (error) return toast(error.message);
   }
-  const { error } = await supabase.from("semesters").delete().eq("id", state.semester.id);
+  const { error } = await supabase.from("semesters").delete().eq("id", semester.id);
   if (error) return toast(error.message);
-  state.semester = null;
-  await loadSemesters();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId && state.semester?.id === semester.id) {
+    state.semester = null;
+    await loadSemesters();
+    await refreshRoomStorage();
+  }
   toast("Semester and its contents were removed.");
 }
 $("#save-semester-name").addEventListener("click", async () => {
@@ -653,8 +672,11 @@ $("#semester-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = $("#new-semester-name").value.trim();
   if (!name || !state.room || state.role !== "admin") return;
-  const { error } = await supabase.from("semesters").insert({ room_id: state.room.id, name, position: state.semesters.length });
+  const roomId = state.room.id;
+  const position = state.semesters.length;
+  const { error } = await supabase.from("semesters").insert({ room_id: roomId, name, position });
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId) return;
   $("#semester-dialog").close();
   $("#semester-form").reset();
   await loadSemesters(name);
@@ -710,11 +732,15 @@ $("#add-subject").addEventListener("click", () => {
 });
 $("#subject-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!state.semester || state.role !== "admin") return;
+  if (!state.semester || state.role !== "admin" || !state.room) return;
+  const semesterId = state.semester.id;
+  const roomId = state.room.id;
   const name = $("#new-subject-name").value.trim();
   const course_code = $("#new-subject-code").value.trim();
-  const { data, error } = await supabase.from("subjects").insert({ semester_id: state.semester.id, name, course_code }).select().single();
+  if (!name) return;
+  const { data, error } = await supabase.from("subjects").insert({ semester_id: semesterId, name, course_code }).select().single();
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId) return;
   $("#subject-dialog").close();
   $("#subject-form").reset();
   state.subjects.push(data);
@@ -789,12 +815,16 @@ function renderSubjects() {
 }
 
 $("#save-subject").addEventListener("click", async () => {
-  if (!state.subject || state.role !== "admin") return;
+  if (!state.subject || state.role !== "admin" || !state.room) return;
+  const subjectId = state.subject.id;
+  const roomId = state.room.id;
+  const semesterId = state.semester?.id;
   const name = $("#rename-subject").value.trim();
   const course_code = $("#rename-subject-code").value.trim();
   if (!name) return toast("Subject name is required.");
-  const { error } = await supabase.from("subjects").update({ name, course_code }).eq("id", state.subject.id);
+  const { error } = await supabase.from("subjects").update({ name, course_code }).eq("id", subjectId);
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId || state.subject?.id !== subjectId) return;
   $("#manage-subject-dialog").close();
   await loadSubjects();
   toast("Subject updated.");
@@ -802,7 +832,9 @@ $("#save-subject").addEventListener("click", async () => {
 
 $("#delete-subject").addEventListener("click", async () => {
   if (!state.subject || state.role !== "admin") return;
-  const subject = state.subject;
+  const subject = { ...state.subject };
+  const roomId = state.room?.id;
+  const semesterId = state.semester?.id;
   if (!confirm(`Delete ${subject.name}, its subject chat, and all shared files? This cannot be undone.`)) return;
   const { data: files, error: fileError } = await supabase.from("subject_files").select("storage_path").eq("subject_id", subject.id);
   if (fileError) return toast(fileError.message);
@@ -815,10 +847,12 @@ $("#delete-subject").addEventListener("click", async () => {
   }
   const { error } = await supabase.from("subjects").delete().eq("id", subject.id);
   if (error) return toast(error.message);
-  $("#manage-subject-dialog").close();
-  state.subject = null;
-  await loadSubjects();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId && state.semester?.id === semesterId && state.subject?.id === subject.id) {
+    $("#manage-subject-dialog").close();
+    state.subject = null;
+    await loadSubjects();
+    await refreshRoomStorage();
+  }
   toast("Subject and its content were removed.");
 });
 

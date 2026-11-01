@@ -43,6 +43,7 @@ assert.deepEqual(missing, [], "app.js references IDs that are absent from both p
 
 JSON.parse(read("manifest.json"));
 JSON.parse(read("hub/manifest.json"));
+assert.equal((schema.match(/create trigger .*_room_quota before insert on public\./gi) || []).length, 3, "schema must define one quota trigger for each room upload table");
 assert.match(schema, /create trigger messages_room_quota before insert on public\.messages/i);
 assert.match(schema, /create trigger subject_files_room_quota before insert on public\.subject_files/i);
 assert.match(schema, /create trigger memories_room_quota before insert on public\.memories/i);

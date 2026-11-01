@@ -43,7 +43,8 @@
     };
     window.addEventListener("error", (event) => {
       if (event.filename || event.target instanceof HTMLScriptElement) {
-        window.reportSpiritStartupError(event.message || "A required app script could not load.");
+        const location = event.filename ? ` (${event.filename}:${event.lineno}:${event.colno})` : "";
+        window.reportSpiritStartupError((event.message || "A required app script could not load.") + location);
       }
     }, true);
     window.addEventListener("unhandledrejection", (event) => {

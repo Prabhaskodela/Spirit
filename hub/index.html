@@ -22,9 +22,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="hub.css?v=20261101-profile-settings-1">
+  <link rel="stylesheet" href="hub.css?v=20261101-profile-settings-2">
   <link rel="stylesheet" href="premium.css?v=20261101-mobile-fix-1">
-  <script type="module" src="hub.js?v=20261101-profile-settings-1"></script>
+  <script type="module" src="hub.js?v=20261101-profile-settings-2"></script>
   <script>
     // hub/ gets its own service worker so the original SpiritHUB app's offline cache, which covers all of
     // /Spirit/, can't serve old copies of this app. It's registered here, not in hub.js, because that cache
@@ -49,8 +49,8 @@
       <ol class="steps">
         <li>Create a free project at <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a>.</li>
         <li>Open <strong>SQL Editor</strong>, paste <code>hub/schema.sql</code> and run it.</li>
-        <li>In <strong>Authentication â†’ Sign In / Providers</strong>, turn off <strong>Confirm email</strong>.</li>
-        <li>Copy the project URL and anon (public) key from <strong>Project Settings â†’ API</strong> into <code>hub/config.js</code>, then reload.</li>
+        <li>In <strong>Authentication → Sign In / Providers</strong>, turn off <strong>Confirm email</strong>.</li>
+        <li>Copy the project URL and anon (public) key from <strong>Project Settings → API</strong> into <code>hub/config.js</code>, then reload.</li>
       </ol>
     </div>
   </section>
@@ -81,11 +81,11 @@
       <nav class="rail" aria-label="Workspaces">
         <div class="rail-list" id="rail-list"></div>
         <button class="rail-btn add" id="new-workspace" type="button" title="Create a workspace" aria-label="Create a workspace">+</button>
-        <button class="rail-btn join" id="join-workspace" type="button" title="Join with an invite code" aria-label="Join with an invite code">â†—</button>
+        <button class="rail-btn join" id="join-workspace" type="button" title="Join with an invite code" aria-label="Join with an invite code">↗</button>
       </nav>
       <aside class="sidebar">
         <header class="ws-header">
-          <button class="ws-name" id="ws-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"><span class="ws-title"><span id="ws-name">SpiritHUB</span><small id="ws-sub"></small></span><span aria-hidden="true">â–¾</span></button>
+          <button class="ws-name" id="ws-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false"><span class="ws-title"><span id="ws-name">SpiritHUB</span><small id="ws-sub"></small></span><span aria-hidden="true">▾</span></button>
           <div class="ws-menu" id="ws-menu" role="menu" hidden>
             <button type="button" role="menuitem" data-ws="invite">Invite people</button>
             <button type="button" role="menuitem" data-ws="settings">Workspace settings</button>
@@ -107,7 +107,7 @@
           <span class="presence-avatar-wrap"><span class="avatar" id="me-avatar">S</span><span class="presence-dot" id="me-online" title="Online" role="img" aria-label="Online" hidden></span></span>
           <div class="me-copy"><strong id="me-name"></strong></div>
           <button class="icon-btn account-settings-toggle" id="account-settings-toggle" type="button" aria-label="Settings" title="Settings" aria-controls="account-settings" aria-expanded="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z"/><path d="m19.4 13.5 1.1.9-1.2 2.1-1.3-.5a7.6 7.6 0 0 1-1.4.8l-.2 1.4h-2.5l-.3-1.4a7.6 7.6 0 0 1-1.5-.6l-1.2.7-1.5-1.8.9-1.1a7.5 7.5 0 0 1-.3-1.6l-1.3-.7.6-2.4 1.4.1a7.7 7.7 0 0 1 1.1-1.2l-.1-1.4 2.3-.9.8 1.2a7.4 7.4 0 0 1 1.6.1l1-1 2 1.4-.6 1.3a7.6 7.6 0 0 1 .7 1.4l1.3.3v2.5l-1.3.4a7.5 7.5 0 0 1-.5 1.5Z"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.5"/><path d="M19.4 13.5 21 14.4l-1.4 2.4-1.7-.6a7.7 7.7 0 0 1-1.3.8l-.3 1.8h-2.8l-.3-1.8a7.7 7.7 0 0 1-1.4-.7l-1.6.8-1.8-2.1 1.1-1.4a7.5 7.5 0 0 1-.3-1.6l-1.6-.8.7-2.7 1.8.1a7.7 7.7 0 0 1 1.1-1.1L11 5.7l2.6-.9.9 1.5a7.4 7.4 0 0 1 1.6.1l1.1-1.2 2.3 1.6-.7 1.7a7.6 7.6 0 0 1 .7 1.4l1.7.4v2.8l-1.8.4Z"/></svg>
           </button>
           <div class="account-settings" id="account-settings" hidden>
             <p class="account-settings-heading">Settings</p>
@@ -128,8 +128,8 @@
 
     <main class="main">
       <header class="channel-header">
-        <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-label="Show workspaces and channels" aria-controls="nav" aria-expanded="false">â˜°<span>Browse</span></button>
-        <h2 class="channel-title"><span class="hash" id="channel-hash">â€¢</span><span id="channel-name"></span></h2>
+        <button class="icon-btn menu-toggle" id="menu-toggle" type="button" aria-label="Show workspaces and channels" aria-controls="nav" aria-expanded="false">☰<span>Browse</span></button>
+        <h2 class="channel-title"><span class="hash" id="channel-hash">•</span><span id="channel-name"></span></h2>
         <span class="channel-sem" id="channel-sem"></span>
         <span class="channel-code" id="channel-code"></span>
         <div class="tabs" role="tablist">
@@ -144,15 +144,15 @@
       <section class="chat" id="chat-view">
         <div class="messages" id="messages"></div>
         <div class="typing-indicator" id="typing-indicator" aria-live="polite" hidden></div>
-        <div class="reply-bar" id="reply-bar" hidden><span id="reply-label"></span><button class="icon-btn" id="reply-cancel" type="button" aria-label="Cancel reply">Ã—</button></div>
+        <div class="reply-bar" id="reply-bar" hidden><span id="reply-label"></span><button class="icon-btn" id="reply-cancel" type="button" aria-label="Cancel reply">×</button></div>
         <form class="composer" id="composer">
-          <label class="attach" title="Upload PDFs or images" aria-label="Upload PDFs or images"><input type="file" id="file-input" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" multiple hidden>ï¼‹</label>
+          <label class="attach" title="Upload PDFs or images" aria-label="Upload PDFs or images"><input type="file" id="file-input" accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" multiple hidden>＋</label>
           <label class="tool" title="Send a GIF (up to 5 MB)" aria-label="Send a GIF"><input type="file" id="gif-input" accept="image/gif" hidden>GIF</label>
           <input id="message-input" autocomplete="off" maxlength="4000" placeholder="Message" enterkeyhint="send" aria-autocomplete="list" aria-controls="mention-picker">
           <button class="tool" id="mention-button" type="button" title="Mention someone" aria-label="Mention someone">@</button>
-          <button class="tool" id="emoji-button" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">ðŸ˜Š</button>
-          <button class="tool" id="sticker-button" type="button" title="Stickers" aria-label="Stickers" aria-expanded="false">âœ¦</button>
-          <button class="send" type="submit" aria-label="Send">â†—</button>
+          <button class="tool" id="emoji-button" type="button" title="Emoji" aria-label="Emoji" aria-expanded="false">😊</button>
+          <button class="tool" id="sticker-button" type="button" title="Stickers" aria-label="Stickers" aria-expanded="false">✦</button>
+          <button class="send" type="submit" aria-label="Send">↗</button>
           <div class="picker" id="emoji-picker" hidden></div>
           <div class="picker sticker-picker" id="sticker-picker" hidden></div>
           <div class="mention-picker" id="mention-picker" role="listbox" aria-label="People to mention" hidden></div>
@@ -169,7 +169,7 @@
       <section class="admin" id="admin-view" hidden></section>
 
       <section class="empty-main" id="empty-main" hidden>
-        <div class="empty-glyph">âœ³</div>
+        <div class="empty-glyph">✳</div>
         <h2>No workspace yet</h2>
         <p class="muted">Create one for your class, or open an invite link from your admin.</p>
         <button class="btn primary" id="empty-create" type="button">Create a workspace</button>
@@ -196,7 +196,7 @@
     <div class="file-viewer-head">
       <h2 id="file-viewer-title"></h2>
       <div class="file-viewer-actions" id="file-viewer-actions" hidden></div>
-      <button class="icon-btn file-viewer-close" id="file-viewer-close" type="button" aria-label="Close file preview">Ã—</button>
+      <button class="icon-btn file-viewer-close" id="file-viewer-close" type="button" aria-label="Close file preview">×</button>
     </div>
     <div class="file-viewer-content" id="file-viewer-content"></div>
   </dialog>
@@ -204,5 +204,4 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
-
 

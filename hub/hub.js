@@ -1,4 +1,4 @@
-// SpiritHUB workspaces: Discord-style class spaces (workspace â†’ semesters â†’ subject channels) on Supabase.
+// SpiritHUB workspaces: Discord-style class spaces (workspace → semesters → subject channels) on Supabase.
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
@@ -19,15 +19,15 @@ const MAX_PHOTO_EDGE = 2048;
 const BACKUP_EVERY = 5 * 60 * 1000; // desktop backup refresh interval
 const isMobileClient = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(max-width: 760px)").matches;
 // The original app's emoji, quick reactions and sticker set.
-const EMOJIS = "ðŸ˜€ ðŸ˜ƒ ðŸ˜„ ðŸ˜ ðŸ˜† ðŸ˜… ðŸ˜‚ ðŸ™‚ ðŸ™ƒ ðŸ˜‰ ðŸ˜Š ðŸ˜ ðŸ¥° ðŸ˜Ž ðŸ¤“ ðŸ¥³ ðŸ¤” ðŸ«¡ ðŸ˜­ ðŸ˜´ ðŸ¤¯ ðŸ«  ðŸ¤— ðŸ¤ ðŸ‘ ðŸ‘Ž ðŸ‘ ðŸ™Œ ðŸ«¶ ðŸ’ª ðŸ”¥ âœ¨ ðŸ’¯ â¤ï¸ ðŸ’œ ðŸ’› ðŸ§  ðŸ“š ðŸ“ ðŸŽ“ â˜• ðŸŒ± ðŸš€ ðŸŽ‰ ðŸ¥¹".split(" ");
-const QUICK_REACTIONS = ["ðŸ‘", "â¤ï¸", "ðŸ˜‚", "ðŸ”¥", "ðŸŽ‰"];
+const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🙂 🙃 😉 😊 😍 🥰 😎 🤓 🥳 🤔 🫡 😭 😴 🤯 🫠 🤗 🤝 👍 👎 👏 🙌 🫶 💪 🔥 ✨ 💯 ❤️ 💜 💛 🧠 📚 📝 🎓 ☕ 🌱 🚀 🎉 🥹".split(" ");
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎉"];
 const STICKERS = [
-  { icon: "ðŸŽ‰", text: "NICE ONE" },
-  { icon: "ðŸ”¥", text: "LET'S GO" },
-  { icon: "ðŸ’œ", text: "GOOD VIBES" },
-  { icon: "ðŸ“š", text: "LOCKED IN" },
-  { icon: "â˜•", text: "BREAK TIME" },
-  { icon: "ðŸ’ª", text: "YOU GOT THIS" },
+  { icon: "🎉", text: "NICE ONE" },
+  { icon: "🔥", text: "LET'S GO" },
+  { icon: "💜", text: "GOOD VIBES" },
+  { icon: "📚", text: "LOCKED IN" },
+  { icon: "☕", text: "BREAK TIME" },
+  { icon: "💪", text: "YOU GOT THIS" },
 ];
 const LAST_KEY = "spirithub-hub:last";
 const INVITE_KEY = "spirithub-hub:invite";
@@ -471,7 +471,7 @@ async function openWorkspace(id) {
   renderRail();
   renderBackground();
   $("ws-name").textContent = workspace.name;
-  $("channel-tree").replaceChildren(el("p", { class: "loading", text: "Loadingâ€¦" }));
+  $("channel-tree").replaceChildren(el("p", { class: "loading", text: "Loading…" }));
   try {
     const [semesters, channels, , channelUnread] = await Promise.all([
       supabase.from("hub_semesters").select("*").eq("workspace_id", id).order("position").order("created_at"),
@@ -520,8 +520,8 @@ async function openChannel(id) {
   refreshStorage();
   setTab("chat");
   renderSidebar();
-  $("messages").replaceChildren(el("p", { class: "loading", text: "Loading messagesâ€¦" }));
-  $("files-view").replaceChildren(el("p", { class: "loading", text: "Loading filesâ€¦" }));
+  $("messages").replaceChildren(el("p", { class: "loading", text: "Loading messages…" }));
+  $("files-view").replaceChildren(el("p", { class: "loading", text: "Loading files…" }));
   const [messages, files] = await Promise.all([
     supabase.from("hub_messages").select("*").eq("channel_id", id).order("created_at", { ascending: false }).limit(PAGE_SIZE),
     supabase.from("hub_files").select("*").eq("channel_id", id).order("created_at", { ascending: false }).limit(300),
@@ -667,7 +667,7 @@ function renderTypingIndicator() {
     if (userId !== state.user?.id && presence.channel_id === state.channel?.id) typing.push(nameOf(userId));
   }
   const hidden = !typing.length || state.tab !== "chat";
-  const label = !typing.length ? "" : typing.length === 1 ? `${typing[0]} is typingâ€¦` : typing.length === 2 ? `${typing[0]} and ${typing[1]} are typingâ€¦` : `${typing.length} people are typingâ€¦`;
+  const label = !typing.length ? "" : typing.length === 1 ? `${typing[0]} is typing…` : typing.length === 2 ? `${typing[0]} and ${typing[1]} are typing…` : `${typing.length} people are typing…`;
   if (node.hidden !== hidden) node.hidden = hidden;
   if (node.textContent !== label) node.textContent = label;
   clearTimeout(typingIndicatorTimer);
@@ -797,14 +797,14 @@ function renderSidebar() {
   const workspace = state.workspace;
   const count = state.members.size;
   $("ws-name").textContent = workspace?.name || "SpiritHUB";
-  $("ws-sub").textContent = workspace ? [workspace.academic_year, `${count} member${count === 1 ? "" : "s"}`].filter(Boolean).join(" Â· ") : "";
+  $("ws-sub").textContent = workspace ? [workspace.academic_year, `${count} member${count === 1 ? "" : "s"}`].filter(Boolean).join(" · ") : "";
   const channelRow = (channel, subjectNumber) => {
     const isUnsemesteredChitChat = !channel.semester_id && String(channel.name || "").trim().toLocaleLowerCase() === "chit chat";
     const unread = state.channelUnread.get(channel.id)?.count || 0;
     const channelName = channelDisplayName(channel.name);
     return el("div", { class: `channel${channel.id === state.channel?.id ? " is-active" : ""}${isUnsemesteredChitChat ? " is-chit-chat" : ""}` },
       el("button", {
-        class: `channel-link${isUnsemesteredChitChat ? " chit-chat-link" : ""}`, type: "button", title: `${channelName}${unread ? ` Â· ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
+        class: `channel-link${isUnsemesteredChitChat ? " chit-chat-link" : ""}`, type: "button", title: `${channelName}${unread ? ` · ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
         "aria-label": `${channelName}${unread ? `, ${unread} unread message${unread === 1 ? "" : "s"}` : ""}`,
         onclick: () => openChannel(channel.id),
       },
@@ -815,14 +815,14 @@ function renderSidebar() {
           el("span", { class: "channel-label", text: channelName }),
           channel.course_code ? el("span", { class: "channel-code-mini", text: channel.course_code }) : null),
         unread ? el("span", { class: "channel-unread", text: unread > 99 ? "99+" : String(unread), "aria-hidden": "true" }) : null),
-      admin ? rowActions([[`Edit ${channelName}`, "âœŽ", () => editChannel(channel)], [`Delete ${channelName}`, "âœ•", () => deleteChannel(channel)]]) : null);
+      admin ? rowActions([[`Edit ${channelName}`, "✎", () => editChannel(channel)], [`Delete ${channelName}`, "✕", () => deleteChannel(channel)]]) : null);
   };
   const tree = [];
   if (workspace) {
     tree.push(el("button", { class: `spirit-ai-link${state.view === "spirit-ai" ? " is-active" : ""}`, type: "button", onclick: openSpiritAi },
-      el("span", { "aria-hidden": "true", text: "âœ¦" }), "Spirit AI"));
+      el("span", { "aria-hidden": "true", text: "✦" }), "Spirit AI"));
     tree.push(el("button", { class: `memories-link${state.view === "memories" ? " is-active" : ""}`, type: "button", onclick: openMemories },
-      el("span", { "aria-hidden": "true", text: "ðŸ“·" }), "Memories"));
+      el("span", { "aria-hidden": "true", text: "📷" }), "Memories"));
   }
   const loose = state.channels.filter((channel) => !channel.semester_id);
   if (loose.length) tree.push(el("div", { class: "category" }, ...loose.map((channel, index) => channelRow(channel, index + 1))));
@@ -830,7 +830,7 @@ function renderSidebar() {
     const channels = state.channels.filter((channel) => channel.semester_id === semester.id);
     tree.push(el("div", { class: "category" },
       el("div", { class: "category-head" }, el("span", { text: semester.name }),
-        admin ? rowActions([[`Add a channel to ${semester.name}`, "+", () => addChannel(semester)], [`Rename ${semester.name}`, "âœŽ", () => renameSemester(semester)], [`Delete ${semester.name}`, "âœ•", () => deleteSemester(semester)]]) : null),
+        admin ? rowActions([[`Add a channel to ${semester.name}`, "+", () => addChannel(semester)], [`Rename ${semester.name}`, "✎", () => renameSemester(semester)], [`Delete ${semester.name}`, "✕", () => deleteSemester(semester)]]) : null),
       ...channels.map((channel, index) => channelRow(channel, index + 1)),
       channels.length ? null : el("p", { class: "category-empty", text: admin ? "No channels yet. Add one with +" : "No channels yet" })));
   }
@@ -840,7 +840,7 @@ function renderSidebar() {
 
 function renderHeader() {
   const channel = state.channel;
-  const special = state.workspace && { "spirit-ai": ["âœ¦", "Spirit AI"], memories: ["ðŸ“·", "Memories"], admin: ["ðŸ› ", "Admin panel"] }[state.view];
+  const special = state.workspace && { "spirit-ai": ["✦", "Spirit AI"], memories: ["📷", "Memories"], admin: ["🛠", "Admin panel"] }[state.view];
   document.querySelector(".channel-title").hidden = !channel && !special;
   document.querySelector(".tabs").hidden = !channel;
   const channelMark = $("channel-hash");
@@ -889,13 +889,13 @@ function showEmpty(kind) {
   const admin = state.role === "admin";
   $("empty-main").hidden = false;
   $("empty-main").replaceChildren(
-    el("div", { class: "empty-glyph", text: "âœ³" }),
+    el("div", { class: "empty-glyph", text: "✳" }),
     el("h2", { text: kind === "workspace" ? "No workspace yet" : "No channels yet" }),
     el("p", {
       class: "muted",
       text: kind === "workspace"
         ? "Create one for your class, or join one with an invite link or code."
-        : admin ? "Add a semester or channel from the â–¾ menu next to the workspace name." : "An admin hasn't added any channels yet.",
+        : admin ? "Add a semester or channel from the ▾ menu next to the workspace name." : "An admin hasn't added any channels yet.",
     }),
     kind === "workspace"
       ? el("div", { class: "empty-actions" },
@@ -911,7 +911,7 @@ function showEmpty(kind) {
 
 function summaryDetails(file) {
   const details = el("details", { class: "file-summary", open: state.openSummaries.has(file.id) },
-    el("summary", { text: `AI summary${file.summarized_by ? ` Â· saved by ${nameOf(file.summarized_by)}` : ""}` }),
+    el("summary", { text: `AI summary${file.summarized_by ? ` · saved by ${nameOf(file.summarized_by)}` : ""}` }),
     el("div", { class: "md", html: markdown(file.summary) }));
   details.addEventListener("toggle", () => (details.open ? state.openSummaries.add(file.id) : state.openSummaries.delete(file.id)));
   return details;
@@ -922,14 +922,14 @@ function summaryDetails(file) {
 function fileCard(file, full = false) {
   const archived = Boolean(file.archived_at);
   const image = file.mime.startsWith("image/") && !archived;
-  const details = full ? `${formatSize(file.size)} Â· ${nameOf(file.user_id)} Â· ${timeLabel(file.created_at)}` : formatSize(file.size);
-  const note = el("small", { text: archived ? `${details} Â· archived to free up space` : details });
+  const details = full ? `${formatSize(file.size)} · ${nameOf(file.user_id)} · ${timeLabel(file.created_at)}` : formatSize(file.size);
+  const note = el("small", { text: archived ? `${details} · archived to free up space` : details });
   const actions = el("div", { class: "file-actions" }, ...(archived ? [] : [
     el("button", { class: "btn small ghost", type: "button", onclick: () => openFile(file) }, "Open"),
     el("button", { class: "btn small", type: "button", onclick: () => summarize(file) }, file.summary ? "Summarize again" : "Summarize"),
   ]));
   const card = el("div", { class: `file-card${full ? " full" : ""}${archived ? " is-archived" : ""}` },
-    archived ? el("span", { class: "file-icon", text: "ðŸ“¦", "aria-hidden": "true" })
+    archived ? el("span", { class: "file-icon", text: "📦", "aria-hidden": "true" })
       : image ? el("img", { class: "file-thumb", alt: "", loading: "lazy" }) : el("span", { class: "file-icon", text: "PDF" }),
     el("div", { class: "file-info" }, el("strong", { text: file.name, title: file.name }), note),
     actions,
@@ -938,7 +938,7 @@ function fileCard(file, full = false) {
   if (archived) {
     backup.fileBlob(file.path).then((blob) => {
       if (!blob) return;
-      note.textContent = `${details} Â· archived, saved on this device`;
+      note.textContent = `${details} · archived, saved on this device`;
       actions.append(el("button", { class: "btn small ghost", type: "button", onclick: () => openFile(file) }, "Open"));
     }).catch(() => {});
   }
@@ -1081,12 +1081,12 @@ function messageNode(message, grouped, reactions) {
   const meta = grouped ? null : el("div", { class: "msg-meta" }, el("strong", { text: name }), el("time", { datetime: message.created_at, text: timeLabel(message.created_at) }));
   const content = el("div", { class: "msg-content" },
     message.reply_to_id
-      ? el("button", { class: "quote", type: "button", title: "Show the original message", onclick: () => jumpTo(message.reply_to_id) }, "â†ª",
+      ? el("button", { class: "quote", type: "button", title: "Show the original message", onclick: () => jumpTo(message.reply_to_id) }, "↪",
         replied ? [el("strong", { text: nameOf(replied.user_id) }), el("span", { text: preview(replied) })] : el("span", { text: "Earlier message" }))
       : null,
     forMe ? el("span", { class: "mention-label", text: "Mentioned you" }) : null,
     message.kind === "sticker" ? stickerNode(message.body) : message.body ? bodyNode(message.body, mentions) : null,
-    file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploadingâ€¦" }) : null,
+    file ? (file.mime === "image/gif" && !file.archived_at ? gifNode(file) : fileCard(file)) : message.file_id ? el("p", { class: "muted small", text: "Uploading…" }) : null,
     seenBy.length ? el("button", { class: "message-seen", type: "button", title: `Seen by ${seenBy.join(", ")}`, "aria-label": `Seen by ${seenBy.length} ${seenBy.length === 1 ? "member" : "members"}`, onclick: () => showSeenBy(seenBy) }, seenBy.length === 1 ? `Seen by ${seenBy[0]}` : `Seen by ${seenBy.length} members`) : null,
     reactions?.length ? reactionsRow(message, reactions) : null);
   const contentRow = el("div", { class: "msg-content-row" }, content, actionsMenu);
@@ -1113,8 +1113,8 @@ function renderMessages(toBottom = false) {
   const nodes = [];
   if (visibleMessages.length < PAGE_SIZE) {
     nodes.push(el("div", { class: "channel-intro" },
-      el("div", { class: "intro-hash", text: "ðŸ’¬", "aria-hidden": "true" }),
-      el("h3", { text: `Welcome to ${channelDisplayName(state.channel.name)}${state.channel.course_code ? ` Â· ${state.channel.course_code}` : ""}` }),
+      el("div", { class: "intro-hash", text: "💬", "aria-hidden": "true" }),
+      el("h3", { text: `Welcome to ${channelDisplayName(state.channel.name)}${state.channel.course_code ? ` · ${state.channel.course_code}` : ""}` }),
       el("p", { class: "muted", text: "Share notes, PDFs and screenshots here. Everyone in the workspace can see them, and anyone can save an AI summary of a file for the rest." })));
   }
   const reactionsByMessage = new Map();
@@ -1157,15 +1157,15 @@ function renderMembers() {
       avatarNode(member, "small"),
       state.onlineMembers.has(member.user_id) ? el("span", { class: "presence-dot", title: "Online", role: "img", "aria-label": "Online" }) : null),
     el("span", { class: "member-name", text: `${member.display_name}${member.user_id === state.user.id ? " (you)" : ""}` }),
-    isBirthday(member) ? el("span", { class: "birthday", title: "Birthday today", "aria-label": "Birthday today", text: "ðŸŽ‚" }) : null,
+    isBirthday(member) ? el("span", { class: "birthday", title: "Birthday today", "aria-label": "Birthday today", text: "🎂" }) : null,
     member.user_id === ownerId ? el("span", { class: "badge", text: "owner" }) : null,
     admin && member.user_id !== ownerId && member.user_id !== state.user.id
       ? rowActions([
-        [member.role === "admin" ? `Make ${member.display_name} a member` : `Make ${member.display_name} an admin`, member.role === "admin" ? "â†“" : "â†‘", () => setRole(member, member.role === "admin" ? "member" : "admin")],
-        [`Remove ${member.display_name}`, "âœ•", () => removeMember(member)],
+        [member.role === "admin" ? `Make ${member.display_name} a member` : `Make ${member.display_name} an admin`, member.role === "admin" ? "↓" : "↑", () => setRole(member, member.role === "admin" ? "member" : "admin")],
+        [`Remove ${member.display_name}`, "✕", () => removeMember(member)],
       ])
       : null);
-  const group = (title, list) => (list.length ? [el("p", { class: "members-head", text: `${title} â€” ${list.length}` }), ...list.map(row)] : []);
+  const group = (title, list) => (list.length ? [el("p", { class: "members-head", text: `${title} — ${list.length}` }), ...list.map(row)] : []);
   $("members-panel").replaceChildren(
     el("div", { class: "members-top" }, el("strong", { text: "Members" }), el("button", { class: "btn small", type: "button", onclick: showInvite }, "Invite")),
     ...group("Admins", people.filter((member) => member.role === "admin")),
@@ -1176,7 +1176,7 @@ function renderMembers() {
 
 async function createWorkspace() {
   const name = el("input", { class: "input", maxlength: 60, placeholder: "e.g. Kalvium Squad 12", required: true });
-  const year = el("input", { class: "input", maxlength: 40, placeholder: "e.g. 2026â€“27" });
+  const year = el("input", { class: "input", maxlength: 40, placeholder: "e.g. 2026–27" });
   const body = el("div", { class: "dialog-fields" },
     el("p", { class: "muted", text: "A workspace is your class space, like a Discord server. You'll be its admin and can invite people with a link or code." }),
     field("Workspace name", name),
@@ -1190,13 +1190,13 @@ async function createWorkspace() {
   }
   await loadWorkspaces();
   await openWorkspace(data);
-  toast("Workspace created. Invite people from the â–¾ menu.");
+  toast("Workspace created. Invite people from the ▾ menu.");
 }
 
 async function editWorkspace() {
   const workspace = state.workspace;
   const name = el("input", { class: "input", maxlength: 60, value: workspace.name, required: true });
-  const year = el("input", { class: "input", maxlength: 40, value: workspace.academic_year || "", placeholder: "e.g. 2026â€“27" });
+  const year = el("input", { class: "input", maxlength: 40, value: workspace.academic_year || "", placeholder: "e.g. 2026–27" });
   const icon = photoField("Workspace photo (shown in the left bar instead of its initials)", workspace.icon_path);
   const background = photoField("Chat background (shows faintly behind every channel's chat)", workspace.background_path);
   const body = el("div", { class: "dialog-fields" }, field("Workspace name", name), field("Academic year (optional)", year), icon.node, background.node);
@@ -1244,7 +1244,7 @@ async function showInvite() {
   };
   const saveCustomCode = async () => {
     const code = customCodeInput.value.trim().toLowerCase();
-    if (!/^[a-z0-9]{4,24}$/.test(code)) return toast("Use 4â€“24 letters or numbers, with no spaces.");
+    if (!/^[a-z0-9]{4,24}$/.test(code)) return toast("Use 4–24 letters or numbers, with no spaces.");
     if (code === codeText.textContent) return toast("That invite code is already in use for this room.");
     if (!confirm("Changing the invite code disables the current code and link for anyone who hasn't joined yet. Continue?")) return;
     const result = await supabase.rpc("hub_set_invite", { ws: state.workspace.id, invite_code: code });
@@ -1261,10 +1261,10 @@ async function showInvite() {
   const body = el("div", {},
     el("p", { class: "muted", text: "Anyone with this link can create an account with their email and their own password, then join. Share it in your class group." }),
     el("div", { class: "copy-row" }, linkInput, el("button", { class: "btn", type: "button", onclick: () => copyText(linkInput.value, "Invite link copied") }, "Copy")),
-    el("p", { class: "muted small" }, "Or they can press â†— (Join) and type the code ", codeText, "."),
+    el("p", { class: "muted small" }, "Or they can press ↗ (Join) and type the code ", codeText, "."),
     state.role === "admin" ? el("section", { class: "custom-invite" },
       el("h3", { text: "Choose a custom code" }),
-      el("p", { class: "muted small", text: "Use 4â€“24 letters or numbers. Saving it replaces the old code and invite link." }),
+      el("p", { class: "muted small", text: "Use 4–24 letters or numbers. Saving it replaces the old code and invite link." }),
       el("div", { class: "custom-invite-row" }, customCodeInput, el("button", { class: "btn primary", type: "button", onclick: saveCustomCode }, "Save code"))) : null,
     state.role === "admin" ? el("button", { class: "link danger", type: "button", onclick: reset }, "Reset invite") : null);
   await ask({ title: `Invite people to ${state.workspace.name}`, body, okLabel: "Done", cancelLabel: null });
@@ -1502,8 +1502,8 @@ async function shrinkImage(file) {
 }
 
 const uploadingLabel = (file, original) => (file === original
-  ? `Uploading ${file.name}â€¦`
-  : `Uploading ${file.name}, shrunk from ${formatSize(original.size)} to ${formatSize(file.size)}â€¦`);
+  ? `Uploading ${file.name}…`
+  : `Uploading ${file.name}, shrunk from ${formatSize(original.size)} to ${formatSize(file.size)}…`);
 
 async function uploadFiles(files) {
   if (!state.channel) return toast("Pick a channel first");
@@ -1574,7 +1574,7 @@ function hasArchiveColumn() {
   return archiveCheck;
 }
 
-const localUrls = new Map(); // storage path â†’ address of the copy in this device's backup
+const localUrls = new Map(); // storage path → address of the copy in this device's backup
 let fileViewRequest = 0;
 
 // Files show from this device's backup when it has them: nothing to download, and archived files still open.
@@ -1606,7 +1606,7 @@ async function openFile(file) {
   $("file-viewer-actions").replaceChildren();
   $("file-viewer-actions").hidden = true;
   content.classList.remove("is-pdf");
-  content.replaceChildren(el("p", { class: "file-viewer-loading", text: "Opening fileâ€¦", role: "status" }));
+  content.replaceChildren(el("p", { class: "file-viewer-loading", text: "Opening file…", role: "status" }));
   if (!viewer.open) viewer.showModal();
   try {
     const url = await fileUrl(file);
@@ -1685,8 +1685,8 @@ function renderStorage() {
   if (state.workspace && isMobileClient() && $("backup-status").hidden) setBackupStatus(state.workspace.id, "Tap to back up on this device");
   $("storage").classList.toggle("is-near", percent >= 80 && percent < 95);
   $("storage").classList.toggle("is-full", percent >= 95);
-  const warning = percent >= 100 ? " Â· full" : percent >= 80 ? " Â· almost full" : "";
-  $("storage-label").textContent = `Workspace files Â· ${state.storageUsed ? formatSize(state.storageUsed) : "0 MB"} / 100 MB${warning}`;
+  const warning = percent >= 100 ? " · full" : percent >= 80 ? " · almost full" : "";
+  $("storage-label").textContent = `Workspace files · ${state.storageUsed ? formatSize(state.storageUsed) : "0 MB"} / 100 MB${warning}`;
   $("storage-fill").style.width = `${percent}%`;
   $("storage-meter").setAttribute("aria-valuenow", String(Math.round(percent)));
   $("free-space").hidden = !(percent >= 80 && state.role === "admin");
@@ -1715,7 +1715,7 @@ async function refreshStorage() {
 
 /* ---------- Backup on this device ---------- */
 
-const backupRuns = new Map(); // workspace id â†’ the backup running for it
+const backupRuns = new Map(); // workspace id → the backup running for it
 let persistAsked = false;
 
 // Every device keeps its own copy of the workspaces it opens (see backup.js). Resolves to whether it worked.
@@ -1757,7 +1757,7 @@ async function syncBackup(workspaceId) {
   if (missing.length && !navigator.connection?.saveData) {
     if (!(await roomFor(sizeOf(missing)))) throw new Error("this device is low on space");
     for (const [index, item] of missing.entries()) {
-      setBackupStatus(workspaceId, `Backing up on this device Â· ${index + 1} of ${missing.length}`);
+      setBackupStatus(workspaceId, `Backing up on this device · ${index + 1} of ${missing.length}`);
       await saveOnDevice(workspaceId, item);
     }
   }
@@ -1828,24 +1828,24 @@ function setBackupStatus(workspaceId, text, problem = false) {
 
 async function showBackupStatus(workspaceId, record) {
   record ||= await backup.syncRecord(workspaceId).catch(() => null);
-  if (!record?.synced_at) return setBackupStatus(workspaceId, isMobileClient() ? "Tap to back up on this device" : "Backing up on this deviceâ€¦");
+  if (!record?.synced_at) return setBackupStatus(workspaceId, isMobileClient() ? "Tap to back up on this device" : "Backing up on this device…");
   const when = new Date(record.synced_at).toDateString() === new Date().toDateString()
     ? shortTime(record.synced_at)
     : new Date(record.synced_at).toLocaleDateString([], { day: "numeric", month: "short" });
-  setBackupStatus(workspaceId, `âœ“ Backed up on this device Â· ${when}`);
+  setBackupStatus(workspaceId, `✓ Backed up on this device · ${when}`);
 }
 
 async function openBackup() {
   const workspace = state.workspace;
   if (!workspace) return;
-  toast("Checking the backupâ€¦");
+  toast("Checking the backup…");
   await Promise.race([backupNow(workspace.id), new Promise((resolve) => setTimeout(resolve, 5000))]);
   const record = await backup.syncRecord(workspace.id).catch(() => null);
   const persisted = await navigator.storage?.persisted?.().catch(() => false);
   const body = el("div", { class: "backup-info" },
     el("p", { text: `SpiritHUB keeps a copy of ${workspace.name} in this browser. On this phone, tap the backup button when you want to save messages, files and Memories photos. Files an admin moves off the online storage still open from here.` }),
     el("p", { class: "muted", text: record?.synced_at
-      ? `${countOf(record.messages, "message")}, ${countOf(record.files, "file")} and ${countOf(record.photos, "photo")} (${record.bytes ? formatSize(record.bytes) : "0 MB"}) Â· updated ${timeLabel(record.synced_at)}`
+      ? `${countOf(record.messages, "message")}, ${countOf(record.files, "file")} and ${countOf(record.photos, "photo")} (${record.bytes ? formatSize(record.bytes) : "0 MB"}) · updated ${timeLabel(record.synced_at)}`
       : "The first backup is still running." }),
     el("p", { class: "muted small", text: persisted
       ? "This browser keeps it even when the device runs low on space."
@@ -1855,8 +1855,8 @@ async function openBackup() {
 
 /* ---------- Photos: workspace photos, chat backgrounds and profile photos ---------- */
 
-const photoUrls = new Map(); // storage path â†’ address of a photo that has loaded
-const photoLoads = new Map(); // storage path â†’ the load in progress
+const photoUrls = new Map(); // storage path → address of a photo that has loaded
+const photoLoads = new Map(); // storage path → the load in progress
 
 // Each photo downloads once per device; after that it comes from this device's backup.
 function loadPhoto(path) {
@@ -2041,7 +2041,7 @@ function photoField(label, path, round = false) {
     el("div", { class: "photo-crop-heading" }, el("strong", { text: "Adjust your profile photo" }), el("span", { text: "Drag to frame it before you save" })),
     cropBox,
     el("div", { class: "photo-crop-footer" },
-      el("p", { class: "photo-crop-hint", text: "Drag to reposition Â· scroll or pinch to zoom" }),
+      el("p", { class: "photo-crop-hint", text: "Drag to reposition · scroll or pinch to zoom" }),
       el("button", { class: "photo-crop-reset", type: "button", onclick: resetCrop }, "Reset")));
   input.addEventListener("change", () => {
     const [file] = input.files;
@@ -2155,7 +2155,7 @@ async function editProfile() {
   const birthday = el("input", { class: "input", type: "date", value: profile.birth_month ? `2000-${pad(profile.birth_month)}-${pad(profile.birth_day)}` : "" });
   const body = el("div", { class: "profile-dialog-body" },
     el("div", { class: "profile-account" },
-      el("span", { class: "profile-account-mark", "aria-hidden": "true", text: "âœ“" }),
+      el("span", { class: "profile-account-mark", "aria-hidden": "true", text: "✓" }),
       el("div", {}, el("small", { text: "SIGNED IN AS" }), el("strong", { text: state.user?.email || "Email unavailable" }))),
     el("div", { class: "profile-layout" },
       el("section", { class: "profile-card profile-photo-card", "aria-labelledby": "profile-photo-title" },
@@ -2164,7 +2164,7 @@ async function editProfile() {
       el("section", { class: "profile-card profile-details-card", "aria-labelledby": "profile-details-title" },
         el("div", { class: "profile-card-heading" }, el("h4", { id: "profile-details-title", text: "Your details" }), el("p", { text: "Choose how classmates see you" })),
         field("Display name", name),
-        field("Birthday Â· optional", birthday),
+        field("Birthday (optional)", birthday),
         el("p", { class: "profile-privacy-note", text: "Only the day and month are saved for birthday reminders." }))));
   if (!(await ask({ title: "Your profile", body, okLabel: "Save changes", className: "profile-dialog" }))) return;
   const [, month, day] = birthday.value ? birthday.value.split("-").map(Number) : [];
@@ -2208,7 +2208,7 @@ async function signOut() {
 
 function setReply(message) {
   state.replyTo = message;
-  $("reply-label").textContent = `Replying to ${nameOf(message.user_id)} Â· ${preview(message)}`;
+  $("reply-label").textContent = `Replying to ${nameOf(message.user_id)} · ${preview(message)}`;
   $("reply-bar").hidden = false;
   $("message-input").focus();
 }
@@ -2388,7 +2388,7 @@ async function openMemories() {
   renderSidebar();
   renderHeader();
   refreshStorage(); // photos others added don't arrive live
-  $("memories-view").replaceChildren(el("p", { class: "loading", text: "Loading memoriesâ€¦" }));
+  $("memories-view").replaceChildren(el("p", { class: "loading", text: "Loading memories…" }));
   const workspaceId = state.workspace.id;
   const { data, error } = await supabase.from("hub_memories").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false });
   if (state.view !== "memories" || state.workspace?.id !== workspaceId) return;
@@ -2410,8 +2410,8 @@ function renderMemories() {
     fileUrl(memory).then((url) => { image.src = url; }).catch(() => {});
     const canDelete = memory.user_id === state.user.id || state.role === "admin";
     return el("figure", { class: "memory" }, image,
-      el("figcaption", { class: "memory-meta", text: `${memory.caption ? `${memory.caption} Â· ` : ""}${nameOf(memory.user_id)} Â· ${timeLabel(memory.created_at)}` }),
-      canDelete ? el("button", { class: "memory-delete", type: "button", title: "Delete photo", "aria-label": "Delete photo", onclick: () => deleteMemory(memory) }, "âœ•") : null);
+      el("figcaption", { class: "memory-meta", text: `${memory.caption ? `${memory.caption} · ` : ""}${nameOf(memory.user_id)} · ${timeLabel(memory.created_at)}` }),
+      canDelete ? el("button", { class: "memory-delete", type: "button", title: "Delete photo", "aria-label": "Delete photo", onclick: () => deleteMemory(memory) }, "✕") : null);
   });
   $("memories-view").replaceChildren(
     el("div", { class: "files-top" },
@@ -2577,8 +2577,8 @@ async function openNotifications() {
   };
   const list = el("div", { class: "notification-list" }, ...(data.length
     ? data.map((item) => el("button", { class: `notification${item.read_at ? " is-read" : ""}`, type: "button", onclick: () => open(item) },
-      el("span", { "aria-hidden": "true", text: { birthday: "ðŸŽ‚", mention: "@" }[item.kind] || "ðŸ’¬" }),
-      el("span", {}, el("strong", { text: item.title }), el("small", { text: `${item.body ? `${item.body} Â· ` : ""}${timeLabel(item.created_at)}` }))))
+      el("span", { "aria-hidden": "true", text: { birthday: "🎂", mention: "@" }[item.kind] || "💬" }),
+      el("span", {}, el("strong", { text: item.title }), el("small", { text: `${item.body ? `${item.body} · ` : ""}${timeLabel(item.created_at)}` }))))
     : [el("p", { class: "muted", text: "You're all caught up. New messages, mentions and birthdays show up here." })]));
   const browserControl = browserNotificationControl();
   const body = el("div", {}, browserControl ? el("div", { class: "notification-tools" }, browserControl) : null, list);
@@ -2599,7 +2599,7 @@ async function checkBirthdays() {
       workspace_id: row.workspace_id,
       kind: "birthday",
       event_key: `birthday:${row.workspace_id}:${row.user_id}:${today.getFullYear()}:${state.user.id}`,
-      title: `It's ${row.profile.display_name}'s birthday! ðŸŽ‚`,
+      title: `It's ${row.profile.display_name}'s birthday! 🎂`,
       body: `Wish them in ${state.workspaces.find((workspace) => workspace.id === row.workspace_id)?.name || "your workspace"}.`,
     }));
   if (!rows.length) return;
@@ -2620,7 +2620,7 @@ function threadFor(channelId) {
 }
 
 function fileChip(file) {
-  const chip = el("button", { class: "file-chip", type: "button" }, file.mime.startsWith("image/") ? "ðŸ–¼ " : "ðŸ“„ ", file.name);
+  const chip = el("button", { class: "file-chip", type: "button" }, file.mime.startsWith("image/") ? "🖼 " : "📄 ", file.name);
   const paint = () => {
     const picked = state.aiPicked.has(file.id);
     chip.classList.toggle("is-picked", picked);
@@ -2642,14 +2642,14 @@ function renderAiView() {
   if (!channel) return;
   const caps = state.ai.caps;
   const readable = state.files.filter((file) => !file.archived_at);
-  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about ${channelDisplayName(channel.name)}, or anything elseâ€¦`, "aria-label": "Your question" });
+  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about ${channelDisplayName(channel.name)}, or anything else…`, "aria-label": "Your question" });
   const form = el("form", { class: "composer", onsubmit: (event) => {
     event.preventDefault();
     const question = input.value.trim();
     if (!question || state.aiBusy) return;
     input.value = "";
     askAi(question);
-  } }, input, el("button", { class: "send", type: "submit", "aria-label": "Ask" }, "â†—"));
+  } }, input, el("button", { class: "send", type: "submit", "aria-label": "Ask" }, "↗"));
   $("ai-view").replaceChildren(
     el("div", { class: "ai-top" },
       el("div", {},
@@ -2671,7 +2671,7 @@ function renderAiThread() {
   if (!box || !state.channel) return;
   const thread = threadFor(state.channel.id);
   if (!thread.length) {
-    box.replaceChildren(el("p", { class: "ai-empty" }, el("span", { "aria-hidden": "true", text: "âœ¦" }),
+    box.replaceChildren(el("p", { class: "ai-empty" }, el("span", { "aria-hidden": "true", text: "✦" }),
       `Ask about this channel's notes and code. Files with a saved summary are included automatically; tap a file above to have the AI read all of it. For example: "Explain the main idea of the PDF" or "Why does my code print 0?"`));
     return;
   }
@@ -2759,7 +2759,7 @@ async function shareAiAnswer(question, answer) {
   const channel = state.channel;
   if (!channel) return;
   if (!(await ask({ title: `Share this answer in ${channelDisplayName(channel.name)}?`, body: "Everyone in the workspace will see it in the chat.", okLabel: "Share" }))) return;
-  const body = `ðŸ¤– AI answer${question ? ` to "${question.slice(0, 200)}"` : ""}:\n\n${answer}`.slice(0, 4000);
+  const body = `🤖 AI answer${question ? ` to "${question.slice(0, 200)}"` : ""}:\n\n${answer}`.slice(0, 4000);
   const { data, error } = await supabase.from("hub_messages").insert({ workspace_id: state.workspace.id, channel_id: channel.id, body }).select().single();
   if (error) return toast(error.message);
   addMessage(data);
@@ -2778,7 +2778,7 @@ async function openAdmin() {
   $("admin-view").hidden = false;
   renderSidebar();
   renderHeader();
-  $("admin-view").replaceChildren(el("p", { class: "loading", text: "Loading everything this workspace storesâ€¦" }));
+  $("admin-view").replaceChildren(el("p", { class: "loading", text: "Loading everything this workspace stores…" }));
   await loadAdmin();
 }
 
@@ -2803,7 +2803,7 @@ function renderAdmin({ files, memories, messages, members, project }) {
   const channels = orderedChannels();
   const label = (channel) => {
     const semester = state.semesters.find((candidate) => candidate.id === channel.semester_id)?.name;
-    return `${channel.name}${semester ? ` Â· ${semester}` : ""}`;
+    return `${channel.name}${semester ? ` · ${semester}` : ""}`;
   };
   const cell = (content, props = {}) => el("td", props, content);
   const buttons = (...items) => el("div", { class: "row-buttons" }, ...items);
@@ -2819,7 +2819,7 @@ function renderAdmin({ files, memories, messages, members, project }) {
 
   const storage = [
     ...channels.map((channel) => ({ where: label(channel), rows: live.filter((file) => file.channel_id === channel.id) })),
-    { where: "ðŸ“· Memories", rows: memories },
+    { where: "📷 Memories", rows: memories },
   ].filter((place) => place.rows.length).sort((a, b) => sizeOf(b.rows) - sizeOf(a.rows));
 
   $("admin-view").replaceChildren(
@@ -2830,7 +2830,7 @@ function renderAdmin({ files, memories, messages, members, project }) {
       tile(String(members.length), plural(members.length, "member")),
       tile(String(channels.length), plural(channels.length, "channel")),
       tile(String(messages.length), plural(messages.length, "message")),
-      tile(String(live.length), `${plural(live.length, "file")}${archived ? ` Â· ${archived} archived` : ""}`),
+      tile(String(live.length), `${plural(live.length, "file")}${archived ? ` · ${archived} archived` : ""}`),
       tile(String(memories.length), plural(memories.length, "photo")),
       tile(used ? formatSize(used) : "0 MB", "of 100 MB used"),
       project === null ? null : tile(project ? formatSize(project) : "0 MB", "of the whole project's 1 GB")),
@@ -2876,7 +2876,7 @@ function renderAdmin({ files, memories, messages, members, project }) {
     }))),
     el("section", {}, el("h4", { text: `All files (${files.length})` }), files.length
       ? table(["File", "Channel", "Shared by", "Size", "Added", "AI summary", ""], files.map((file) => el("tr", {},
-        cell(`${file.archived_at ? "ðŸ“¦ " : ""}${file.name}`, { class: "file-name", title: file.archived_at ? `${file.name} (archived to free up space)` : file.name }),
+        cell(`${file.archived_at ? "📦 " : ""}${file.name}`, { class: "file-name", title: file.archived_at ? `${file.name} (archived to free up space)` : file.name }),
         cell(state.channels.find((channel) => channel.id === file.channel_id)?.name || "Deleted channel"),
         cell(nameOf(file.user_id)),
         cell(formatSize(file.size), { class: "num" }),
@@ -2884,7 +2884,7 @@ function renderAdmin({ files, memories, messages, members, project }) {
         cell(file.summary ? "Saved" : "None"),
         cell(buttons(button("Open", () => openFile(file)), button("Delete", () => deleteFile(file), true))))))
       : el("p", { class: "muted small", text: "No files yet." })),
-    el("p", { class: "muted small admin-note", text: "Sign-in emails and passwords are kept by Supabase's sign-in service and never shown here, so classmates' emails stay private. The Supabase project owner can see accounts in the Supabase dashboard under Authentication â†’ Users." }));
+    el("p", { class: "muted small admin-note", text: "Sign-in emails and passwords are kept by Supabase's sign-in service and never shown here, so classmates' emails stay private. The Supabase project owner can see accounts in the Supabase dashboard under Authentication → Users." }));
 }
 
 // Moves old files off Supabase so the workspace never fills up. Every device backs up the workspaces it opens,
@@ -2929,13 +2929,13 @@ async function freeUpSpace(files) {
   const workspaceId = state.workspace.id;
   try {
     for (const [index, file] of files.entries()) {
-      toast(`Saving on this device: ${index + 1} of ${files.length}â€¦`, 600000);
+      toast(`Saving on this device: ${index + 1} of ${files.length}…`, 600000);
       if (!(await saveOnDevice(workspaceId, file))) return toast(`Couldn't save ${file.name} on this device, so nothing was removed. Check your connection and try again.`);
     }
   } catch (error) {
     return toast(`Nothing was removed: ${error.message}.`);
   }
-  toast("Freeing up spaceâ€¦", 600000);
+  toast("Freeing up space…", 600000);
   const paths = files.map((file) => file.path);
   for (let start = 0; start < paths.length; start += 100) {
     const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(start, start + 100));
@@ -3006,7 +3006,7 @@ function renderSpiritAiView() {
     id: "spirit-ai-input",
     autocomplete: "off",
     maxlength: 4000,
-    placeholder: "Ask Spirit AI for this workspaceâ€¦",
+    placeholder: "Ask Spirit AI for this workspace…",
     "aria-label": "Ask Spirit AI",
   });
   const fileInput = el("input", {
@@ -3018,19 +3018,19 @@ function renderSpiritAiView() {
     class: "attach spirit-ai-attach",
     title: "Attach one PDF or image (up to 4 MB)",
     "aria-label": "Attach a PDF or image",
-  }, fileInput, "ï¼‹");
+  }, fileInput, "＋");
   const fileRow = el("div", { class: "spirit-ai-file-row", hidden: true });
   const removeFile = el("button", {
     class: "icon-btn",
     type: "button",
     "aria-label": "Remove attachment",
-  }, "Ã—");
+  }, "×");
   let attachedFile = null;
   const setAttachedFile = (file) => {
     attachedFile = file;
     fileRow.hidden = !file;
     fileRow.replaceChildren(
-      file ? el("span", { text: "ðŸ“Ž " + file.name + " Â· " + formatSpiritAiFileSize(file.size) + " Â· ready to send" }) : null,
+      file ? el("span", { text: "📎 " + file.name + " · " + formatSpiritAiFileSize(file.size) + " · ready to send" }) : null,
       file ? removeFile : null,
     );
   };
@@ -3074,7 +3074,7 @@ function renderSpiritAiView() {
     class: "send",
     type: "submit",
     "aria-label": "Ask Spirit AI",
-  }, "â†—"));
+  }, "↗"));
   $("spirit-ai-view").replaceChildren(
     el("div", { class: "ai-top spirit-ai-top" },
       el("div", {},
@@ -3096,14 +3096,14 @@ function renderSpiritAiThread() {
   const thread = spiritAiThreadFor(workspace.id);
   if (!thread.length) {
     box.replaceChildren(el("p", { class: "ai-empty" },
-      el("span", { "aria-hidden": "true", text: "âœ¦" }),
+      el("span", { "aria-hidden": "true", text: "✦" }),
       "Ask a question or attach a Python problem screenshot. Spirit AI can explain the steps and write code. This chat is private on this device."));
     return;
   }
   box.replaceChildren(...thread.map((message) => {
     if (message.role === "user") {
       return el("div", { class: "ask-msg own spirit-ai-user" },
-        message.attachmentName ? el("span", { class: "spirit-ai-attachment-name", text: "ðŸ“Ž " + message.attachmentName }) : null,
+        message.attachmentName ? el("span", { class: "spirit-ai-attachment-name", text: "📎 " + message.attachmentName }) : null,
         el("span", { text: message.text }));
     }
     const node = el("div", {
@@ -3136,10 +3136,10 @@ async function sendSpiritAi(prompt, file) {
       onProgress: file ? ({ stage, percent = 0 }) => {
         const progress = Math.floor(percent / 5) * 5;
         const status = stage === "preparing"
-          ? `Preparing fileâ€¦ ${progress}%`
+          ? `Preparing file… ${progress}%`
           : stage === "uploading"
-            ? `Uploading fileâ€¦ ${progress}%`
-            : "File sent. Spirit AI is analyzing itâ€¦";
+            ? `Uploading file… ${progress}%`
+            : "File sent. Spirit AI is analyzing it…";
         if (answer.text !== status) {
           answer.text = status;
           if (state.workspace?.id === workspace.id && state.view === "spirit-ai") renderSpiritAiThread();
@@ -3169,7 +3169,7 @@ async function refreshAi() {
   const result = await checkAi(state.ai.settings);
   state.ai.caps = result;
   const accountStatus = $("account-ai-status");
-  if (accountStatus) accountStatus.textContent = result.ok ? `Connected Â· ${result.model}` : "Not connected Â· runs on your device";
+  if (accountStatus) accountStatus.textContent = result.ok ? `Connected · ${result.model}` : "Not connected · runs on your device";
   return result;
 }
 
@@ -3219,7 +3219,7 @@ async function openAiSettings() {
   const check = el("div", { class: "ai-check muted" }, "Summaries run on your own laptop with Ollama. Files go from SpiritHUB to your laptop and nowhere else.");
   const test = async () => {
     const chosen = { url: url.value.trim() || AI_DEFAULTS.url, model: model.value.trim() || AI_DEFAULTS.model };
-    check.replaceChildren("Checkingâ€¦");
+    check.replaceChildren("Checking…");
     check.replaceChildren(...aiHelp(await checkAi(chosen), chosen.model));
   };
   const body = el("div", { class: "ai-form" },
@@ -3239,10 +3239,10 @@ async function summarize(file) {
     toast("Connect the AI on your laptop first");
     return openAiSettings();
   }
-  const status = el("p", { class: "muted small", text: "Downloading the fileâ€¦" });
+  const status = el("p", { class: "muted small", text: "Downloading the file…" });
   const output = el("div", { class: "md summary-output" });
   const controller = new AbortController();
-  const closed = ask({ title: `Summary Â· ${file.name}`, body: el("div", {}, status, output), okLabel: "Save for everyone" }).then((ok) => {
+  const closed = ask({ title: `Summary · ${file.name}`, body: el("div", {}, status, output), okLabel: "Save for everyone" }).then((ok) => {
     controller.abort();
     return ok;
   });
@@ -3335,7 +3335,7 @@ $("account-settings-toggle").addEventListener("click", (event) => {
   $("account-settings-toggle").setAttribute("aria-expanded", String(open));
   if (open) {
     const caps = state.ai.caps;
-    $("account-ai-status").textContent = caps ? (caps.ok ? `Connected Â· ${caps.model}` : "Not connected Â· runs on your device") : "Checking connectionâ€¦";
+    $("account-ai-status").textContent = caps ? (caps.ok ? `Connected · ${caps.model}` : "Not connected · runs on your device") : "Checking connection…";
     menu.querySelector("[data-account-action='profile']")?.focus();
   }
 });
@@ -3459,5 +3459,4 @@ if (!configured) {
     }, 0);
   });
 }
-
 

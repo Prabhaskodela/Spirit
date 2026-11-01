@@ -8,7 +8,7 @@ const schema = read("schema.sql");
 
 function inspectHtml(path, rootPrefix = "/Spirit/") {
   const html = read(path);
-  const ids = [...html.matchAll(/\b id=["']([^"']+)["']/g)].map((match) => match[1]);
+  const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.deepEqual(duplicates, [], `${path} has duplicate element IDs`);
 

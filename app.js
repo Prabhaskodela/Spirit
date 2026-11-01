@@ -960,6 +960,7 @@ let pdfJsPromise;
 let activePdfDocument = null;
 let activePdfObserver = null;
 let activePdfScale = 1;
+let pdfViewerRequestId = 0;
 
 function isPdfAttachment(file) {
   return file?.mime_type === "application/pdf" || file?.attachment_type === "application/pdf" || /\.pdf$/i.test(file?.display_name || file?.attachment_name || "");
@@ -992,6 +993,7 @@ function getPdfViewer() {
   dialog.querySelector("[data-pdf-zoom-in]").addEventListener("click", () => changePdfZoom(0.15));
   dialog.querySelector("[data-pdf-zoom-out]").addEventListener("click", () => changePdfZoom(-0.15));
   dialog.addEventListener("close", () => {
+    pdfViewerRequestId++;
     activePdfObserver?.disconnect();
     activePdfObserver = null;
     activePdfDocument?.destroy?.();
@@ -1016,6 +1018,7 @@ function changePdfZoom(delta) {
 }
 
 async function openPdfViewer(storagePath, fileName) {
+  const requestId = ++pdfViewerRequestId;
   const dialog = getPdfViewer();
   const title = dialog.querySelector(".pdf-viewer-title");
   const status = dialog.querySelector(".pdf-viewer-status");
@@ -1031,17 +1034,23 @@ async function openPdfViewer(storagePath, fileName) {
   download.removeAttribute("href");
   if (!dialog.open) dialog.showModal();
   try {
-    const [{ data, error }, pdfjs] = await Promise.all([
-      supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600),
-      pdfJsPromise || (pdfJsPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs"))
-    ]);
+    // Obtain the signed preview URL first so Download still works if the PDF.js CDN is unavailable.
+    const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600);
     if (error || !data?.signedUrl) throw error || new Error("Could not create a secure PDF link.");
-    if (!dialog.open) return;
+    if (!dialog.open || requestId !== pdfViewerRequestId) return;
+    const { data: downloadData, error: downloadError } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600, { download: fileName || "document.pdf" });
+    if (downloadData?.signedUrl) download.href = downloadData.signedUrl;
+    else {
+      download.href = data.signedUrl;
+      download.download = fileName || "document.pdf";
+      if (downloadError) console.warn("PDF download URL fallback", downloadError);
+    }
+    // Load the heavier PDF renderer only after the signed file URL is ready.
+    const pdfjs = await (pdfJsPromise || (pdfJsPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs")));
+    if (!dialog.open || requestId !== pdfViewerRequestId) return;
     pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
-    download.href = data.signedUrl;
-    download.download = fileName || "document.pdf";
     const pdf = await pdfjs.getDocument({ url: data.signedUrl }).promise;
-    if (!dialog.open) { pdf.destroy(); return; }
+    if (!dialog.open || requestId !== pdfViewerRequestId) { pdf.destroy(); return; }
     activePdfDocument = pdf;
     status.textContent = `${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"} · Scroll to read`;
     const fragment = document.createDocumentFragment();
@@ -1075,7 +1084,7 @@ async function openPdfViewer(storagePath, fileName) {
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
         await page.render({ canvasContext: context, viewport, transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0] }).promise;
-        if (activePdfDocument && dialog.open) container.append(canvas);
+        if (activePdfDocument && dialog.open && requestId === pdfViewerRequestId) container.append(canvas);
       } catch (renderError) {
         container.dataset.rendered = "false";
         console.error("PDF page render failed", renderError);
@@ -1091,7 +1100,11 @@ async function openPdfViewer(storagePath, fileName) {
     }, { root: pages, rootMargin: "500px 0px" });
     pages.querySelectorAll(".pdf-page").forEach((page) => activePdfObserver.observe(page));
   } catch (error) {
-    status.textContent = "This PDF could not be displayed. Please use Download to open it.";
+    if (requestId === pdfViewerRequestId) {
+      status.textContent = download.href
+        ? "Preview unavailable. You can still download this PDF."
+        : "This PDF could not be displayed. Please try again.";
+    }
     console.error("PDF viewer error", error);
   }
 }
@@ -1215,10 +1228,17 @@ async function loadMessages() {
     const { data: reactions } = await supabase.from("chat_reactions").select("id,message_id,user_id,emoji").in("message_id", messageIds);
     const grouped = groupReactions(reactions || []);
     const messageMap = new Map(messages.map((message) => [message.id, message]));
-    const attachmentEntries = await Promise.all(messages.filter((message) => message.attachment_path).map(async (message) => {
-      const { data } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
-      return [message.id, data?.signedUrl || null];
-    }));
+    const attachments = messages.filter((message) => message.attachment_path);
+    const attachmentEntries = [];
+    // Limit concurrent signed-URL requests to avoid flooding Storage on large chat histories.
+    for (let index = 0; index < attachments.length; index += 8) {
+      const batch = attachments.slice(index, index + 8);
+      const signedBatch = await Promise.all(batch.map(async (message) => {
+        const { data } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
+        return [message.id, data?.signedUrl || null];
+      }));
+      attachmentEntries.push(...signedBatch);
+    }
     const attachmentUrls = new Map(attachmentEntries);
     const rendered = await Promise.all(messages.map((message) => buildMessage(message, profiles, messageMap, grouped.get(message.id) || [], attachmentUrls.get(message.id))));
     const fragment = document.createDocumentFragment();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "spirithub-hub-shell-v1";
+const CACHE_NAME = "spirithub-hub-shell-v2";
 const APP_FILES = [
   "./",
   "./index.html",

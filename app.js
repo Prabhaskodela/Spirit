@@ -819,10 +819,24 @@ async function loadSubjectChat() {
     empty.textContent = "Start the conversation for this subject. Share a question, PDF, or image.";
     list.append(empty);
   } else {
-    const names = await loadProfiles(messages.map((message) => message.user_id));
-    const { data: reactions } = await supabase.from("chat_reactions").select("id,subject_message_id,user_id,emoji").in("subject_message_id", messages.map((message) => message.id));
+    const [names, reactionResult] = await Promise.all([
+      loadProfiles(messages.map((message) => message.user_id)),
+      supabase.from("chat_reactions").select("id,subject_message_id,user_id,emoji").in("subject_message_id", messages.map((message) => message.id))
+    ]);
+    const { data: reactions } = reactionResult;
     const grouped = groupReactions(reactions || []);
     const messageMap = new Map(messages.map((message) => [message.id, message]));
+    const attachmentUrls = new Map();
+    const attachments = messages.filter((message) => message.attachment_path && !isPdfAttachment(message));
+    for (let index = 0; index < attachments.length; index += 8) {
+      const batch = attachments.slice(index, index + 8);
+      const signedBatch = await Promise.all(batch.map(async (message) => {
+        const { data } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
+        return [message.id, data?.signedUrl || null];
+      }));
+      signedBatch.forEach(([id, url]) => attachmentUrls.set(id, url));
+    }
+    const fragment = document.createDocumentFragment();
     for (const message of messages) {
       const row = document.createElement("article");
       row.className = `subject-message${message.user_id === state.user.id ? " own" : ""}`;
@@ -842,14 +856,31 @@ async function loadSubjectChat() {
         row.append(content);
       }
       if (message.attachment_path) {
-        const { data: signed } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 300, { download: message.attachment_name });
-        if (signed?.signedUrl) {
-          const link = document.createElement("a");
-          link.href = signed.signedUrl;
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = `↓ ${message.attachment_name} · ${formatBytes(message.attachment_size)}`;
-          row.append(link);
+        if (isPdfAttachment(message)) {
+          const actions = document.createElement("div");
+          actions.className = "subject-attachment-actions";
+          const preview = document.createElement("button");
+          preview.type = "button";
+          preview.className = "subject-attachment-button";
+          preview.textContent = `View PDF · ${message.attachment_name}`;
+          preview.addEventListener("click", () => openPdfViewer(message.attachment_path, message.attachment_name));
+          const save = document.createElement("button");
+          save.type = "button";
+          save.className = "subject-attachment-button";
+          save.textContent = "Download";
+          save.addEventListener("click", () => downloadSubjectAttachment(message.attachment_path, message.attachment_name));
+          actions.append(preview, save);
+          row.append(actions);
+        } else {
+          const signedUrl = attachmentUrls.get(message.id);
+          if (signedUrl) {
+            const link = document.createElement("a");
+            link.href = signedUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = `↓ ${message.attachment_name} · ${formatBytes(message.attachment_size)}`;
+            row.append(link);
+          }
         }
       }
       const messageReactions = grouped.get(message.id) || [];
@@ -886,8 +917,9 @@ async function loadSubjectChat() {
         actions.append(react);
       }
       row.append(actions);
-      list.append(row);
+      fragment.append(row);
     }
+    list.append(fragment);
   }
   list.scrollTop = list.scrollHeight;
   if (!state.subjectChatChannel) {
@@ -938,6 +970,166 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+
+let pdfJsPromise;
+let activePdfDocument = null;
+let activePdfObserver = null;
+let activePdfScale = 1;
+let pdfViewerRequestId = 0;
+
+function isPdfAttachment(file) {
+  return file?.mime_type === "application/pdf" || file?.attachment_type === "application/pdf" || /\.pdf$/i.test(file?.display_name || file?.attachment_name || "");
+}
+
+function getPdfViewer() {
+  let dialog = document.getElementById("pdf-viewer-dialog");
+  if (dialog) return dialog;
+  dialog = document.createElement("dialog");
+  dialog.id = "pdf-viewer-dialog";
+  dialog.className = "pdf-viewer-dialog";
+  dialog.setAttribute("aria-label", "PDF document viewer");
+  dialog.innerHTML = `
+    <div class="pdf-viewer-shell">
+      <header class="pdf-viewer-toolbar">
+        <strong class="pdf-viewer-title">PDF preview</strong>
+        <div class="pdf-viewer-actions">
+          <button type="button" data-pdf-zoom-out aria-label="Zoom out">−</button>
+          <button type="button" data-pdf-zoom-in aria-label="Zoom in">＋</button>
+          <a data-pdf-download href="#" download>Download</a>
+          <button type="button" data-pdf-close aria-label="Close PDF viewer">×</button>
+        </div>
+      </header>
+      <p class="pdf-viewer-status" role="status" aria-live="polite">Loading document…</p>
+      <div class="pdf-viewer-pages" tabindex="0" aria-label="PDF pages"></div>
+    </div>`;
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog || event.target.closest("[data-pdf-close]")) dialog.close();
+  });
+  dialog.querySelector("[data-pdf-zoom-in]").addEventListener("click", () => changePdfZoom(0.15));
+  dialog.querySelector("[data-pdf-zoom-out]").addEventListener("click", () => changePdfZoom(-0.15));
+  dialog.addEventListener("close", () => {
+    pdfViewerRequestId++;
+    activePdfObserver?.disconnect();
+    activePdfObserver = null;
+    activePdfDocument?.destroy?.();
+    activePdfDocument = null;
+    dialog.querySelector(".pdf-viewer-pages").replaceChildren();
+    dialog.querySelector(".pdf-viewer-status").textContent = "";
+  });
+  document.body.append(dialog);
+  return dialog;
+}
+
+function changePdfZoom(delta) {
+  if (!activePdfDocument) return;
+  activePdfScale = Math.min(2.2, Math.max(0.65, activePdfScale + delta));
+  const dialog = getPdfViewer();
+  dialog.querySelectorAll(".pdf-page").forEach((page) => {
+    page.dataset.rendered = "false";
+    const canvas = page.querySelector("canvas");
+    if (canvas) canvas.remove();
+    activePdfObserver?.observe(page);
+  });
+}
+
+async function openPdfViewer(storagePath, fileName) {
+  const requestId = ++pdfViewerRequestId;
+  const dialog = getPdfViewer();
+  const title = dialog.querySelector(".pdf-viewer-title");
+  const status = dialog.querySelector(".pdf-viewer-status");
+  const pages = dialog.querySelector(".pdf-viewer-pages");
+  const download = dialog.querySelector("[data-pdf-download]");
+  activePdfObserver?.disconnect();
+  activePdfDocument?.destroy?.();
+  activePdfDocument = null;
+  activePdfScale = 1;
+  pages.replaceChildren();
+  title.textContent = fileName || "PDF preview";
+  status.textContent = "Loading document…";
+  download.removeAttribute("href");
+  if (!dialog.open) dialog.showModal();
+  try {
+    // Obtain the signed preview URL first so Download still works if the PDF.js CDN is unavailable.
+    const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600);
+    if (error || !data?.signedUrl) throw error || new Error("Could not create a secure PDF link.");
+    if (!dialog.open || requestId !== pdfViewerRequestId) return;
+    const { data: downloadData, error: downloadError } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600, { download: fileName || "document.pdf" });
+    if (downloadData?.signedUrl) download.href = downloadData.signedUrl;
+    else {
+      download.href = data.signedUrl;
+      download.download = fileName || "document.pdf";
+      if (downloadError) console.warn("PDF download URL fallback", downloadError);
+    }
+    // Load the heavier PDF renderer only after the signed file URL is ready.
+    const pdfjs = await (pdfJsPromise || (pdfJsPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs")));
+    if (!dialog.open || requestId !== pdfViewerRequestId) return;
+    pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs";
+    const pdf = await pdfjs.getDocument({ url: data.signedUrl }).promise;
+    if (!dialog.open || requestId !== pdfViewerRequestId) { pdf.destroy(); return; }
+    activePdfDocument = pdf;
+    status.textContent = `${pdf.numPages} page${pdf.numPages === 1 ? "" : "s"} · Scroll to read`;
+    const fragment = document.createDocumentFragment();
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = document.createElement("section");
+      page.className = "pdf-page";
+      page.dataset.page = String(pageNumber);
+      page.dataset.rendered = "false";
+      page.setAttribute("aria-label", `Page ${pageNumber}`);
+      const label = document.createElement("span");
+      label.className = "pdf-page-number";
+      label.textContent = `Page ${pageNumber}`;
+      page.append(label);
+      fragment.append(page);
+    }
+    pages.append(fragment);
+    const renderPage = async (container) => {
+      if (container.dataset.rendered === "true" || !activePdfDocument) return;
+      container.dataset.rendered = "true";
+      try {
+        const page = await activePdfDocument.getPage(Number(container.dataset.page));
+        const base = page.getViewport({ scale: 1 });
+        const width = Math.max(240, pages.clientWidth - 24);
+        const scale = Math.min(width / base.width, 1.8) * activePdfScale;
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d", { alpha: false });
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(viewport.width * ratio);
+        canvas.height = Math.floor(viewport.height * ratio);
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        await page.render({ canvasContext: context, viewport, transform: ratio === 1 ? null : [ratio, 0, 0, ratio, 0, 0] }).promise;
+        if (activePdfDocument && dialog.open && requestId === pdfViewerRequestId) container.append(canvas);
+      } catch (renderError) {
+        container.dataset.rendered = "false";
+        console.error("PDF page render failed", renderError);
+      }
+    };
+    activePdfObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          activePdfObserver.unobserve(entry.target);
+          renderPage(entry.target);
+        }
+      });
+    }, { root: pages, rootMargin: "500px 0px" });
+    pages.querySelectorAll(".pdf-page").forEach((page) => activePdfObserver.observe(page));
+  } catch (error) {
+    if (requestId === pdfViewerRequestId) {
+      status.textContent = download.href
+        ? "Preview unavailable. You can still download this PDF."
+        : "This PDF could not be displayed. Please try again.";
+    }
+    console.error("PDF viewer error", error);
+  }
+}
+
+async function downloadSubjectAttachment(storagePath, fileName) {
+  const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 300, { download: fileName });
+  if (error) return toast(error.message);
+  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+}
+
 function buildFileRow(file) {
   const row = document.createElement("div");
   row.className = "file-row";
@@ -962,7 +1154,18 @@ function buildFileRow(file) {
     if (error) return toast(error.message);
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   });
-  row.append(type, copy, download);
+  row.append(type, copy);
+  if (isPdfAttachment(file)) {
+    const preview = document.createElement("button");
+    preview.type = "button";
+    preview.className = "file-action";
+    preview.title = "View PDF";
+    preview.setAttribute("aria-label", `View ${file.display_name}`);
+    preview.textContent = "↗";
+    preview.addEventListener("click", () => openPdfViewer(file.storage_path, file.display_name));
+    row.append(preview);
+  }
+  row.append(download);
   if (file.user_id === state.user.id || state.role === "admin") {
     const remove = document.createElement("button");
     remove.type = "button";
@@ -1035,12 +1238,30 @@ async function loadMessages() {
     placeholder.append(icon, text);
     list.append(placeholder);
   } else {
-    const profiles = await loadProfiles(messages.map((message) => message.user_id));
     const messageIds = messages.map((message) => message.id);
-    const { data: reactions } = await supabase.from("chat_reactions").select("id,message_id,user_id,emoji").in("message_id", messageIds);
+    const [profiles, reactionResult] = await Promise.all([
+      loadProfiles(messages.map((message) => message.user_id)),
+      supabase.from("chat_reactions").select("id,message_id,user_id,emoji").in("message_id", messageIds)
+    ]);
+    const { data: reactions } = reactionResult;
     const grouped = groupReactions(reactions || []);
     const messageMap = new Map(messages.map((message) => [message.id, message]));
-    for (const message of messages) list.append(await buildMessage(message, profiles, messageMap, grouped.get(message.id) || []));
+    const attachments = messages.filter((message) => message.attachment_path);
+    const attachmentEntries = [];
+    // Limit concurrent signed-URL requests to avoid flooding Storage on large chat histories.
+    for (let index = 0; index < attachments.length; index += 8) {
+      const batch = attachments.slice(index, index + 8);
+      const signedBatch = await Promise.all(batch.map(async (message) => {
+        const { data } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
+        return [message.id, data?.signedUrl || null];
+      }));
+      attachmentEntries.push(...signedBatch);
+    }
+    const attachmentUrls = new Map(attachmentEntries);
+    const rendered = await Promise.all(messages.map((message) => buildMessage(message, profiles, messageMap, grouped.get(message.id) || [], attachmentUrls.get(message.id))));
+    const fragment = document.createDocumentFragment();
+    rendered.forEach((element) => fragment.append(element));
+    list.append(fragment);
   }
   list.scrollTop = list.scrollHeight;
   if (!state.chatChannel) {
@@ -1066,7 +1287,7 @@ function groupReactions(reactions) {
   return grouped;
 }
 
-async function buildMessage(message, profiles, messageMap, reactions) {
+async function buildMessage(message, profiles, messageMap, reactions, attachmentUrl) {
   const name = getProfileName(message.user_id, profiles);
   const own = message.user_id === state.user.id;
   const article = document.createElement("article");
@@ -1097,15 +1318,14 @@ async function buildMessage(message, profiles, messageMap, reactions) {
       bubble.append(icon, document.createTextNode(sticker.text));
     } else bubble.textContent = message.body;
   } else if (message.body) bubble.textContent = message.body;
-  if (message.attachment_path) {
-    const { data } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
-    if (data?.signedUrl) {
-      const image = document.createElement("img");
-      image.className = "message-gif";
-      image.src = data.signedUrl;
-      image.alt = "GIF shared in chat";
-      bubble.append(image);
-    }
+  if (message.attachment_path && attachmentUrl) {
+    const image = document.createElement("img");
+    image.className = "message-gif";
+    image.src = attachmentUrl;
+    image.alt = "GIF shared in chat";
+    image.loading = "lazy";
+    image.decoding = "async";
+    bubble.append(image);
   }
   body.append(meta, bubble);
   if (reactions.length) {

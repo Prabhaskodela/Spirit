@@ -1187,6 +1187,7 @@ function getPdfViewer() {
         <div class="pdf-viewer-actions">
           <button type="button" data-pdf-zoom-out aria-label="Zoom out">−</button>
           <button type="button" data-pdf-zoom-in aria-label="Zoom in">＋</button>
+          <a data-pdf-open href="#" target="_blank" rel="noopener noreferrer">Open PDF</a>
           <a data-pdf-download href="#" download>Download</a>
           <button type="button" data-pdf-close aria-label="Close PDF viewer">×</button>
         </div>
@@ -1231,6 +1232,7 @@ async function openPdfViewer(storagePath, fileName) {
   const status = dialog.querySelector(".pdf-viewer-status");
   const pages = dialog.querySelector(".pdf-viewer-pages");
   const download = dialog.querySelector("[data-pdf-download]");
+  const openNative = dialog.querySelector("[data-pdf-open]");
   activePdfObserver?.disconnect();
   activePdfDocument?.destroy?.();
   activePdfDocument = null;
@@ -1239,12 +1241,16 @@ async function openPdfViewer(storagePath, fileName) {
   title.textContent = fileName || "PDF preview";
   status.textContent = "Loading document…";
   download.removeAttribute("href");
+  openNative.removeAttribute("href");
   if (!dialog.open) dialog.showModal();
   try {
     // Obtain the signed preview URL first so Download still works if the PDF.js CDN is unavailable.
     const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600);
     if (error || !data?.signedUrl) throw error || new Error("Could not create a secure PDF link.");
     if (!dialog.open || requestId !== pdfViewerRequestId) return;
+    // Keep a native-browser route available on iOS/Android if PDF.js or its worker cannot start.
+    openNative.href = data.signedUrl;
+    openNative.setAttribute("aria-label", `Open ${fileName || "PDF"} in the browser`);
     const { data: downloadData, error: downloadError } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 3600, { download: fileName || "document.pdf" });
     if (downloadData?.signedUrl) download.href = downloadData.signedUrl;
     else {
@@ -1308,9 +1314,9 @@ async function openPdfViewer(storagePath, fileName) {
     pages.querySelectorAll(".pdf-page").forEach((page) => activePdfObserver.observe(page));
   } catch (error) {
     if (requestId === pdfViewerRequestId) {
-      status.textContent = download.href
-        ? "Preview unavailable. You can still download this PDF."
-        : "This PDF could not be displayed. Please try again.";
+      status.textContent = openNative.href
+        ? "In-app preview failed. Tap Open PDF to use your phone’s PDF viewer, or Download to save it."
+        : "Could not create a secure PDF link. Check your connection and try again.";
     }
     console.error("PDF viewer error", error);
   }

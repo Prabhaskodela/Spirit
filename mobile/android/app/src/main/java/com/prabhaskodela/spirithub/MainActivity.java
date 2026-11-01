@@ -38,4 +38,6 @@ public class MainActivity extends BridgeActivity {
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
-        ViewCompa
+        ViewCompat.requestApplyInsets(content);
+    }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "Spirited Workspace",
+  "short_name": "Spirited Workspace",
+  "description": "A shared class space for subjects, files, conversations, and semester memories.",
+  "start_url": "/Spirit/hub/",
+  "scope": "/Spirit/hub/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#101116",
+  "theme_color": "#101116",
+  "icons": [
+    {
+      "src": "/Spirit/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Spirit/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Spirit/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

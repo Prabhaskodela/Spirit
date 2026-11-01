@@ -1,10 +1,10 @@
-const CACHE_NAME = "spirithub-hub-shell-v6";
+const CACHE_NAME = "spirithub-hub-shell-v7";
 const APP_FILES = [
   "./",
   "./index.html",
   "./manifest.json",
-  "../styles.css?v=20261101-pdf-fallback-2",
-  "../app.js?v=20261101-pdf-fallback-2",
+  "../styles.css?v=20261101-keyboard-1",
+  "../app.js?v=20261101-keyboard-1",
   "../app-config.js",
   "../logo.svg",
   "../spirit-wordmark.png",

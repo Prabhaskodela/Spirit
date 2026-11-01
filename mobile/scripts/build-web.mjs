@@ -12,6 +12,7 @@ await mkdir(webDir, { recursive: true });
 for (const name of ["index.html", "hub.js", "hub.css", "premium.css", "ai.js", "backup.js", "spirit-ai.js", "config.js"]) {
   await cp(resolve(hubDir, name), resolve(webDir, name));
 }
+await cp(resolve(mobileDir, "mobile-native.css"), resolve(webDir, "mobile-native.css"));
 await cp(resolve(repoDir, "icons"), resolve(webDir, "icons"), { recursive: true });
 await cp(resolve(repoDir, "spirit-wordmark.png"), resolve(webDir, "spirit-wordmark.png"));
 
@@ -31,12 +32,16 @@ for (const density of ["drawable", "drawable-land-hdpi", "drawable-land-mdpi", "
 
 const htmlPath = resolve(webDir, "index.html");
 let html = await readFile(htmlPath, "utf8");
+if (!html.includes("<title>SpiritHUB Workspaces</title>") || !html.includes('src="hub.js?')) {
+  throw new Error("The Android package must be built from the SpiritHUB Workspaces app in hub/.");
+}
 html = html
   .replaceAll("../icons/", "./icons/")
   .replaceAll("../spirit-wordmark.png", "./spirit-wordmark.png")
   .replace('<link rel="manifest" href="./manifest.json">', "")
   .replace('if ("serviceWorker" in navigator && location.protocol === "https:") {', 'if (!navigator.userAgent.includes("SpiritHUBAndroid") && "serviceWorker" in navigator && location.protocol === "https:") {')
   .replaceAll("20261101-profile-settings-2", "android-native-1");
+html = html.replace("</head>", '  <link rel="stylesheet" href="mobile-native.css">\n</head>');
 await writeFile(htmlPath, html, "utf8");
 
 await build({
@@ -48,4 +53,4 @@ await build({
   target: "es2020",
 });
 
-console.log("Prepared local SpiritHUB web assets and native Capacitor plugins.");
+console.log("Prepared SpiritHUB Workspaces (hub/) for the Android app.");

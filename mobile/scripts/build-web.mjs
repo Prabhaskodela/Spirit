@@ -32,18 +32,4 @@ for (const density of ["drawable", "drawable-land-hdpi", "drawable-land-mdpi", "
 
 const htmlPath = resolve(webDir, "index.html");
 let html = await readFile(htmlPath, "utf8");
-html = html
-  .replaceAll("/Spirit/", "./")
-  .replace(/^[ \\t]*<link rel="manifest" href="\\.\\/manifest\\.json">[ \\t]*\\r?\\n/m, "");
-  .replace(/<link rel="manifest"[^>]*>\s*/, "");
-
-await build({
-  entryPoints: [resolve(mobileDir, "native-runtime-entry.js")],
-  outfile: resolve(webDir, "native-runtime.js"),
-  bundle: true,
-  format: "esm",
-  platform: "browser",
-  target: "es2020",
-});
-
-console.log("Prepared the SpiritHUB /hub/ experience and native Capacitor plugins.");
+html = html.replaceAll("/Spirit/", "./").replace(/<link rel="manifest"[^>]*>\\s*/, "");

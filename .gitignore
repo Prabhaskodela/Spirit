@@ -1,0 +1,9 @@
+/mobile/node_modules/
+/mobile/www/
+/mobile/android/.gradle/
+/mobile/android/local.properties
+/mobile/android/build/
+/mobile/android/app/build/
+/mobile/android/app/src/main/assets/
+/mobile/android/app/src/main/res/mipmap-*/ic_launcher*.png
+/mobile/android/app/src/main/res/drawable*/splash.png

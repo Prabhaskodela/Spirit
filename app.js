@@ -3,6 +3,8 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./app-config.js";
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const configured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(SUPABASE_URL) && !SUPABASE_URL.includes("YOUR_") && SUPABASE_ANON_KEY.length > 30 && !SUPABASE_ANON_KEY.includes("YOUR_");
+const isNativeAndroid = navigator.userAgent.includes("SpiritHUBAndroid");
+const nativeRuntimePromise = isNativeAndroid ? import("./native-runtime.js") : Promise.resolve(null);
 let createClient = null;
 if (configured) {
   try {
@@ -11,7 +13,9 @@ if (configured) {
     // Keep the cached app shell available when the network or CDN is unreachable.
   }
 }
-const supabase = configured && createClient ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const supabase = configured && createClient ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { flowType: isNativeAndroid ? "pkce" : "implicit", detectSessionInUrl: !isNativeAndroid },
+}) : null;
 const state = { user: null, profile: null, rooms: [], room: null, role: "member", semesters: [], semester: null, subjects: [], subject: null, chatChannel: null, subjectChatChannel: null, replyTo: null, subjectReplyTo: null, busy: false };
 const MAX_UPLOAD = 50 * 1024 * 1024;
 const ROOM_STORAGE_LIMIT = 100 * 1024 * 1024;
@@ -81,15 +85,49 @@ else if (!supabase) {
   $("#google-sign-in").disabled = true;
 }
 
+async function completeNativeOAuth(url) {
+  if (!isNativeAndroid || !url) return;
+  const callback = new URL(url);
+  if (callback.protocol !== "spirithub:" || callback.hostname !== "auth") return;
+  const fragment = new URLSearchParams(callback.hash.slice(1));
+  const error = callback.searchParams.get("error_description") || fragment.get("error_description");
+  if (error) throw new Error(error);
+  const code = callback.searchParams.get("code");
+  let result;
+  if (code) {
+    result = await supabase.auth.exchangeCodeForSession(code);
+  } else {
+    const access_token = fragment.get("access_token");
+    const refresh_token = fragment.get("refresh_token");
+    if (!access_token || !refresh_token) return;
+    result = await supabase.auth.setSession({ access_token, refresh_token });
+  }
+  if (result.error) throw result.error;
+  const native = await nativeRuntimePromise;
+  await native.Browser.close().catch(() => {});
+}
+
 $("#google-sign-in").addEventListener("click", async () => {
   if (!supabase) return;
   setBusy(true);
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.origin + window.location.pathname },
-  });
-  setBusy(false);
-  if (error) toast(error.message);
+  try {
+    const native = isNativeAndroid ? await nativeRuntimePromise : null;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: isNativeAndroid
+        ? { redirectTo: "spirithub://auth/callback", skipBrowserRedirect: true }
+        : { redirectTo: window.location.origin + window.location.pathname },
+    });
+    if (error) throw error;
+    if (isNativeAndroid) {
+      if (!data?.url) throw new Error("Google sign-in could not start. Please try again.");
+      await native.Browser.open({ url: data.url });
+    }
+  } catch (error) {
+    toast(error?.message || "Google sign-in could not start. Please try again.");
+  } finally {
+    setBusy(false);
+  }
 });
 
 if (supabase) {
@@ -110,6 +148,17 @@ if (supabase) {
   });
   // Fallback in case the initial auth event is delayed by the browser.
   supabase.auth.getSession().then(({ data }) => handleAuthSession(data.session)).catch(() => {});
+  if (isNativeAndroid) {
+    void nativeRuntimePromise.then(async ({ App }) => {
+      await App.addListener("appUrlOpen", ({ url }) => {
+        void completeNativeOAuth(url).catch((error) => toast(error?.message || "Google sign-in could not finish."));
+      });
+      const launch = await App.getLaunchUrl();
+      if (launch?.url) {
+        await completeNativeOAuth(launch.url).catch((error) => toast(error?.message || "Google sign-in could not finish."));
+      }
+    }).catch((error) => console.error("Native Android auth could not start", error));
+  }
 }
 
 async function clearRealtimeChannels() {
@@ -1225,6 +1274,15 @@ function changePdfZoom(delta) {
   });
 }
 
+async function openNativePdf(url, title) {
+  const native = await nativeRuntimePromise;
+  const filename = String(title || "document.pdf").replace(/[\\/:*?"<>|]/g, "_").trim() || "document.pdf";
+  const path = `SpiritHUB/${filename}`;
+  const { uri } = await native.Filesystem.getUri({ path, directory: native.Directory.Cache });
+  await native.FileTransfer.downloadFile({ url, path: uri });
+  await native.FileOpener.open({ filePath: uri, contentType: "application/pdf", openWithDefault: true });
+}
+
 async function openPdfViewer(storagePath, fileName) {
   const requestId = ++pdfViewerRequestId;
   const dialog = getPdfViewer();
@@ -1267,6 +1325,11 @@ async function openPdfViewer(storagePath, fileName) {
       download.href = data.signedUrl;
       download.download = fileName || "document.pdf";
       if (downloadError) console.warn("PDF download URL fallback", downloadError);
+    }
+    if (isNativeAndroid) {
+      await openNativePdf(downloadData?.signedUrl || data.signedUrl, fileName);
+      if (dialog.open && requestId === pdfViewerRequestId) dialog.close();
+      return;
     }
     // Load the heavier PDF renderer only after the signed file URL is ready.
     const pdfjs = await (pdfJsPromise || (pdfJsPromise = import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs")));
@@ -1349,6 +1412,11 @@ async function openPdfViewer(storagePath, fileName) {
 async function downloadSubjectAttachment(storagePath, fileName) {
   const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 300, { download: fileName });
   if (error) return toast(error.message);
+  if (isNativeAndroid) {
+    const native = await nativeRuntimePromise;
+    await native.Browser.open({ url: data.signedUrl });
+    return;
+  }
   const link = document.createElement("a");
   link.href = data.signedUrl;
   link.download = fileName || "download";
@@ -1840,7 +1908,7 @@ $("#account-name").addEventListener("click", () => {
 });
 $("#account-name").setAttribute("title", "Click to edit your display name");
 
-if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
+if (!isNativeAndroid && "serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
   const hubApp = window.location.pathname.startsWith("/Spirit/hub/");
   const workerPath = hubApp ? "/Spirit/hub/sw.js" : "/Spirit/sw.js";
   const workerScope = hubApp ? "/Spirit/hub/" : "/Spirit/";

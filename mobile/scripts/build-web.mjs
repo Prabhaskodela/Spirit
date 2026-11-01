@@ -1,0 +1,51 @@
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
+
+const mobileDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const repoDir = resolve(mobileDir, "..");
+const hubDir = resolve(repoDir, "hub");
+const webDir = resolve(mobileDir, "www");
+
+await mkdir(webDir, { recursive: true });
+for (const name of ["index.html", "hub.js", "hub.css", "premium.css", "ai.js", "backup.js", "spirit-ai.js", "config.js"]) {
+  await cp(resolve(hubDir, name), resolve(webDir, name));
+}
+await cp(resolve(repoDir, "icons"), resolve(webDir, "icons"), { recursive: true });
+await cp(resolve(repoDir, "spirit-wordmark.png"), resolve(webDir, "spirit-wordmark.png"));
+
+const androidRes = resolve(mobileDir, "android/app/src/main/res");
+for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
+  const mipmapDir = resolve(androidRes, `mipmap-${density}`);
+  await mkdir(mipmapDir, { recursive: true });
+  await cp(resolve(repoDir, "icons/icon-192.png"), resolve(mipmapDir, "ic_launcher.png"));
+  await cp(resolve(repoDir, "icons/icon-192.png"), resolve(mipmapDir, "ic_launcher_round.png"));
+  await cp(resolve(repoDir, "icons/icon-512-maskable.png"), resolve(mipmapDir, "ic_launcher_foreground.png"));
+}
+for (const density of ["drawable", "drawable-land-hdpi", "drawable-land-mdpi", "drawable-land-xhdpi", "drawable-land-xxhdpi", "drawable-land-xxxhdpi", "drawable-port-hdpi", "drawable-port-mdpi", "drawable-port-xhdpi", "drawable-port-xxhdpi", "drawable-port-xxxhdpi"]) {
+  const drawableDir = resolve(androidRes, density);
+  await mkdir(drawableDir, { recursive: true });
+  await cp(resolve(repoDir, "icons/icon-512.png"), resolve(drawableDir, "splash.png"));
+}
+
+const htmlPath = resolve(webDir, "index.html");
+let html = await readFile(htmlPath, "utf8");
+html = html
+  .replaceAll("../icons/", "./icons/")
+  .replaceAll("../spirit-wordmark.png", "./spirit-wordmark.png")
+  .replace('<link rel="manifest" href="./manifest.json">', "")
+  .replace('if ("serviceWorker" in navigator && location.protocol === "https:") {', 'if (!navigator.userAgent.includes("SpiritHUBAndroid") && "serviceWorker" in navigator && location.protocol === "https:") {')
+  .replaceAll("20261101-profile-settings-2", "android-native-1");
+await writeFile(htmlPath, html, "utf8");
+
+await build({
+  entryPoints: [resolve(mobileDir, "native-runtime-entry.js")],
+  outfile: resolve(webDir, "native-runtime.js"),
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: "es2020",
+});
+
+console.log("Prepared local SpiritHUB web assets and native Capacitor plugins.");

@@ -33,7 +33,12 @@ const LAST_KEY = "spirithub-hub:last";
 const INVITE_KEY = "spirithub-hub:invite";
 
 const configured = /^https:\/\/\S+/.test(SUPABASE_URL) && !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
-const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const isNativeAndroid = navigator.userAgent.includes("SpiritHUBAndroid");
+const NATIVE_AUTH_REDIRECT = "spirithub://auth/callback";
+const nativeRuntimePromise = isNativeAndroid ? import("./native-runtime.js") : Promise.resolve(null);
+const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { flowType: isNativeAndroid ? "pkce" : "implicit", detectSessionInUrl: !isNativeAndroid },
+}) : null;
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -243,16 +248,45 @@ function friendlyAuthError(error) {
 
 $("auth-switch").addEventListener("click", () => setAuthMode(state.authMode === "signin" ? "signup" : "signin"));
 
+async function completeNativeOAuth(url) {
+  if (!isNativeAndroid || !url) return;
+  const callback = new URL(url);
+  if (callback.protocol !== "spirithub:" || callback.hostname !== "auth") return;
+  const fragment = new URLSearchParams(callback.hash.slice(1));
+  const error = callback.searchParams.get("error_description") || fragment.get("error_description");
+  if (error) throw new Error(error);
+  const code = callback.searchParams.get("code");
+  let result;
+  if (code) {
+    result = await supabase.auth.exchangeCodeForSession(code);
+  } else {
+    const access_token = fragment.get("access_token");
+    const refresh_token = fragment.get("refresh_token");
+    if (!access_token || !refresh_token) return;
+    result = await supabase.auth.setSession({ access_token, refresh_token });
+  }
+  if (result.error) throw result.error;
+  const native = await nativeRuntimePromise;
+  await native.Browser.close().catch(() => {});
+}
+
 $("google-sign-in").addEventListener("click", async () => {
   const button = $("google-sign-in");
   button.disabled = true;
   authMessage("");
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
+    const native = isNativeAndroid ? await nativeRuntimePromise : null;
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${location.origin}${location.pathname}${location.search}` },
+      options: isNativeAndroid
+        ? { redirectTo: NATIVE_AUTH_REDIRECT, skipBrowserRedirect: true }
+        : { redirectTo: `${location.origin}${location.pathname}${location.search}` },
     });
     if (error) throw error;
+    if (isNativeAndroid) {
+      if (!data?.url) throw new Error("Google sign-in could not start. Please try again.");
+      await native.Browser.open({ url: data.url });
+    }
   } catch (error) {
     authMessage(friendlyAuthError(error));
     button.disabled = false;
@@ -1597,6 +1631,27 @@ async function fileData(item) {
   return data;
 }
 
+async function openNativePdf(url, title) {
+  const native = await nativeRuntimePromise;
+  const filename = String(title || "document.pdf").replace(/[\\/:*?"<>|]/g, "_").trim() || "document.pdf";
+  const path = `SpiritHUB/${filename}`;
+  let uri;
+  if (url.startsWith("blob:")) {
+    const blob = await (await fetch(url)).blob();
+    const encoded = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = () => reject(reader.error || new Error("Could not prepare this PDF."));
+      reader.readAsDataURL(blob);
+    });
+    ({ uri } = await native.Filesystem.writeFile({ path, data: encoded, directory: native.Directory.Cache, recursive: true }));
+  } else {
+    ({ uri } = await native.Filesystem.getUri({ path, directory: native.Directory.Cache }));
+    await native.FileTransfer.downloadFile({ url, path: uri });
+  }
+  await native.FileOpener.open({ filePath: uri, contentType: "application/pdf", openWithDefault: true });
+}
+
 async function openFile(file) {
   const request = ++fileViewRequest;
   const viewer = $("file-viewer");
@@ -1612,6 +1667,11 @@ async function openFile(file) {
     const url = await fileUrl(file);
     if (!url) throw new Error("This file was archived to free up space, and it isn't saved on this device.");
     if (request !== fileViewRequest || !viewer.open) return;
+    if (isNativeAndroid && file.mime === "application/pdf") {
+      await openNativePdf(url, title);
+      if (request === fileViewRequest && viewer.open) viewer.close();
+      return;
+    }
     let preview;
     if (file.mime.startsWith("image/")) {
       preview = el("img", { class: "file-viewer-image", src: url, alt: title });
@@ -1622,7 +1682,13 @@ async function openFile(file) {
       const android = /Android/i.test(navigator.userAgent);
       const openLink = el("a", { class: "file-viewer-action", href: url, target: "_blank", rel: "noopener", text: android ? "Open PDF" : "Open in new tab" });
       actions.append(openLink);
-      actions.append(el("a", { class: "file-viewer-action", href: await signedUrl(file.path, title), text: "Download PDF", download: title }));
+      const downloadUrl = await signedUrl(file.path, title);
+      const downloadLink = el("a", { class: "file-viewer-action", href: downloadUrl, text: "Download PDF", download: title });
+      if (isNativeAndroid) downloadLink.addEventListener("click", (event) => {
+        event.preventDefault();
+        void nativeRuntimePromise.then(({ Browser }) => Browser.open({ url: downloadUrl })).catch((error) => toast(error.message));
+      });
+      actions.append(downloadLink);
       preview = el("iframe", { class: "file-viewer-pdf", src: url, title });
       content.classList.add("is-pdf");
     } else {
@@ -3458,5 +3524,24 @@ if (!configured) {
       sessionQueue = sessionQueue.then(() => handleSession(current?.user || null));
     }, 0);
   });
+  if (isNativeAndroid) {
+    void nativeRuntimePromise.then(async ({ App }) => {
+      await App.addListener("appUrlOpen", ({ url }) => {
+        void completeNativeOAuth(url).catch((error) => {
+          authMessage(friendlyAuthError(error));
+          $("google-sign-in").disabled = false;
+        });
+      });
+      const launch = await App.getLaunchUrl();
+      if (launch?.url) {
+        await completeNativeOAuth(launch.url).catch((error) => {
+          authMessage(friendlyAuthError(error));
+          $("google-sign-in").disabled = false;
+        });
+      }
+    }).catch((error) => {
+      console.error("Native Android auth could not start", error);
+    });
+  }
 }
 

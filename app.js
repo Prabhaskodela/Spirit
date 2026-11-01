@@ -17,6 +17,31 @@ const MAX_UPLOAD = 50 * 1024 * 1024;
 const ROOM_STORAGE_LIMIT = 100 * 1024 * 1024;
 const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🙂 🙃 😉 😊 😍 🥰 😎 🤓 🥳 🤔 🫡 😭 😴 🤯 🫠 🤗 🤝 👍 👎 👏 🙌 🫶 💪 🔥 ✨ 💯 ❤️ 💜 💛 🧠 📚 📝 🎓 ☕ 🌱 🚀 🎉 🥹".split(" ");
 const STICKERS = [{icon:"🎉",text:"NICE ONE"},{icon:"🔥",text:"LET'S GO"},{icon:"💜",text:"GOOD VIBES"},{icon:"📚",text:"LOCKED IN"},{icon:"☕",text:"BREAK TIME"},{icon:"💪",text:"YOU GOT THIS"}];
+let roomChatRefreshTimer = null;
+let subjectChatRefreshTimer = null;
+let roomChatLoadVersion = 0;
+let subjectChatLoadVersion = 0;
+let memoriesLoadVersion = 0;
+
+function scheduleRefresh(callback, kind) {
+  const isSubject = kind === "subject";
+  clearTimeout(isSubject ? subjectChatRefreshTimer : roomChatRefreshTimer);
+  const timer = setTimeout(() => {
+    if (isSubject) subjectChatRefreshTimer = null;
+    else roomChatRefreshTimer = null;
+    callback();
+  }, 140);
+  if (isSubject) subjectChatRefreshTimer = timer;
+  else roomChatRefreshTimer = timer;
+}
+
+function updateViewportHeight() {
+  const height = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty("--app-height", `${Math.round(height)}px`);
+}
+updateViewportHeight();
+window.addEventListener("resize", updateViewportHeight, { passive: true });
+window.visualViewport?.addEventListener("resize", updateViewportHeight, { passive: true });
 
 function toast(message) {
   const node = $("#toast");
@@ -809,9 +834,13 @@ async function loadSubjectFiles() {
 
 async function loadSubjectChat() {
   if (!state.subject) return;
+  const subjectId = state.subject.id;
+  const loadVersion = ++subjectChatLoadVersion;
   const list = $("#subject-message-list");
+  if (!list) return;
   const { data: messages, error } = await supabase.from("subject_messages").select("id,subject_id,room_id,user_id,body,attachment_path,attachment_name,attachment_type,attachment_size,reply_to_id,created_at").eq("subject_id", state.subject.id).order("created_at", { ascending: true }).limit(100);
   if (error) return toast(error.message);
+  if (state.subject?.id !== subjectId || loadVersion !== subjectChatLoadVersion || !list.isConnected) return;
   list.replaceChildren();
   if (!messages?.length) {
     const empty = document.createElement("p");
@@ -921,9 +950,10 @@ async function loadSubjectChat() {
     }
     list.append(fragment);
   }
+  if (state.subject?.id !== subjectId || loadVersion !== subjectChatLoadVersion || !list.isConnected) return;
   list.scrollTop = list.scrollHeight;
   if (!state.subjectChatChannel) {
-    state.subjectChatChannel = supabase.channel(`subject-chat-${state.subject.id}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "subject_messages", filter: `subject_id=eq.${state.subject.id}` }, () => loadSubjectChat()).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => loadSubjectChat()).subscribe();
+    state.subjectChatChannel = supabase.channel(`subject-chat-${subjectId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "subject_messages", filter: `subject_id=eq.${subjectId}` }, () => scheduleRefresh(loadSubjectChat, "subject")).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => scheduleRefresh(loadSubjectChat, "subject")).subscribe();
   }
 }
 
@@ -1224,9 +1254,12 @@ function getProfileName(userId, profileMap) {
 
 async function loadMessages() {
   if (!state.room || $("#chat-section").hidden) return;
+  const roomId = state.room.id;
+  const loadVersion = ++roomChatLoadVersion;
   const list = $("#message-list");
   const { data: messages, error } = await supabase.from("messages").select("id,room_id,user_id,body,message_kind,attachment_path,attachment_type,reply_to_id,created_at").eq("room_id", state.room.id).order("created_at", { ascending: true }).limit(100);
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || loadVersion !== roomChatLoadVersion || $("#chat-section").hidden) return;
   list.replaceChildren();
   if (!messages?.length) {
     const placeholder = document.createElement("div");
@@ -1263,9 +1296,10 @@ async function loadMessages() {
     rendered.forEach((element) => fragment.append(element));
     list.append(fragment);
   }
+  if (state.room?.id !== roomId || loadVersion !== roomChatLoadVersion || $("#chat-section").hidden) return;
   list.scrollTop = list.scrollHeight;
   if (!state.chatChannel) {
-    state.chatChannel = supabase.channel(`room-chat-${state.room.id}`).on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${state.room.id}` }, () => loadMessages()).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => loadMessages()).subscribe();
+    state.chatChannel = supabase.channel(`room-chat-${roomId}`).on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` }, () => scheduleRefresh(loadMessages, "room")).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => scheduleRefresh(loadMessages, "room")).subscribe();
   }
 }
 
@@ -1484,20 +1518,36 @@ $("#memory-files").addEventListener("change", async (event) => {
 
 async function loadMemories() {
   if (!state.room) return;
+  const roomId = state.room.id;
+  const loadVersion = ++memoriesLoadVersion;
   const grid = $("#memory-grid");
   grid.replaceChildren();
-  const { data, error } = await supabase.from("memories").select("id,room_id,user_id,storage_path,media_type,caption,created_at").eq("room_id", state.room.id).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("memories").select("id,room_id,user_id,storage_path,media_type,caption,created_at").eq("room_id", roomId).order("created_at", { ascending: false });
   if (error) return toast(error.message);
-  $("#memory-empty").hidden = !!data?.length;
-  for (const memory of data || []) {
-    const { data: signed, error: signedError } = await supabase.storage.from("spirit-memories").createSignedUrl(memory.storage_path, 3600);
-    if (signedError) continue;
+  if (state.room?.id !== roomId || loadVersion !== memoriesLoadVersion) return;
+  const memories = data || [];
+  $("#memory-empty").hidden = !!memories.length;
+  const signedEntries = [];
+  for (let index = 0; index < memories.length; index += 8) {
+    const batch = memories.slice(index, index + 8);
+    const signedBatch = await Promise.all(batch.map(async (memory) => {
+      const { data: signed, error: signedError } = await supabase.storage.from("spirit-memories").createSignedUrl(memory.storage_path, 3600);
+      return [memory.id, signedError ? null : signed?.signedUrl || null];
+    }));
+    signedEntries.push(...signedBatch);
+  }
+  if (state.room?.id !== roomId || loadVersion !== memoriesLoadVersion) return;
+  const signedUrls = new Map(signedEntries);
+  for (const memory of memories) {
+    const signedUrl = signedUrls.get(memory.id);
+    if (!signedUrl) continue;
     const card = document.createElement("article");
     card.className = "memory-card";
     const media = document.createElement("img");
     media.alt = memory.caption || "A shared room memory";
     media.loading = "lazy";
-    media.src = signed.signedUrl;
+    media.decoding = "async";
+    media.src = signedUrl;
     card.append(media);
     if (memory.caption) {
       const caption = document.createElement("span");

@@ -819,8 +819,11 @@ async function loadSubjectChat() {
     empty.textContent = "Start the conversation for this subject. Share a question, PDF, or image.";
     list.append(empty);
   } else {
-    const names = await loadProfiles(messages.map((message) => message.user_id));
-    const { data: reactions } = await supabase.from("chat_reactions").select("id,subject_message_id,user_id,emoji").in("subject_message_id", messages.map((message) => message.id));
+    const [names, reactionResult] = await Promise.all([
+      loadProfiles(messages.map((message) => message.user_id)),
+      supabase.from("chat_reactions").select("id,subject_message_id,user_id,emoji").in("subject_message_id", messages.map((message) => message.id))
+    ]);
+    const { data: reactions } = reactionResult;
     const grouped = groupReactions(reactions || []);
     const messageMap = new Map(messages.map((message) => [message.id, message]));
     const attachmentUrls = new Map();
@@ -1235,9 +1238,12 @@ async function loadMessages() {
     placeholder.append(icon, text);
     list.append(placeholder);
   } else {
-    const profiles = await loadProfiles(messages.map((message) => message.user_id));
     const messageIds = messages.map((message) => message.id);
-    const { data: reactions } = await supabase.from("chat_reactions").select("id,message_id,user_id,emoji").in("message_id", messageIds);
+    const [profiles, reactionResult] = await Promise.all([
+      loadProfiles(messages.map((message) => message.user_id)),
+      supabase.from("chat_reactions").select("id,message_id,user_id,emoji").in("message_id", messageIds)
+    ]);
+    const { data: reactions } = reactionResult;
     const grouped = groupReactions(reactions || []);
     const messageMap = new Map(messages.map((message) => [message.id, message]));
     const attachments = messages.filter((message) => message.attachment_path);

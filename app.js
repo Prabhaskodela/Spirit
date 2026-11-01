@@ -22,6 +22,11 @@ let subjectChatRefreshTimer = null;
 let roomChatLoadVersion = 0;
 let subjectChatLoadVersion = 0;
 let memoriesLoadVersion = 0;
+let roomSelectionVersion = 0;
+let semestersLoadVersion = 0;
+let subjectsLoadVersion = 0;
+let subjectFilesLoadVersion = 0;
+let authHandledUserId;
 
 function scheduleRefresh(callback, kind) {
   const isSubject = kind === "subject";
@@ -84,33 +89,66 @@ $("#google-sign-in").addEventListener("click", async () => {
 });
 
 if (supabase) {
+  const handleAuthSession = async (session) => {
+    const user = session?.user ?? null;
+    const userId = user?.id ?? null;
+    if (userId === authHandledUserId) return;
+    authHandledUserId = userId;
+    state.user = user;
+    if (user) await onSignedIn(userId);
+    else {
+      await clearRealtimeChannels();
+      showSignedOut();
+    }
+  };
   supabase.auth.onAuthStateChange((_event, session) => {
-    queueMicrotask(async () => {
-      state.user = session?.user ?? null;
-      if (state.user) await onSignedIn();
-      else showSignedOut();
-    });
+    queueMicrotask(() => handleAuthSession(session));
   });
-  supabase.auth.getSession().then(({ data }) => {
-    state.user = data.session?.user ?? null;
-    if (state.user) onSignedIn();
-  });
+  // Fallback in case the initial auth event is delayed by the browser.
+  supabase.auth.getSession().then(({ data }) => handleAuthSession(data.session)).catch(() => {});
+}
+
+async function clearRealtimeChannels() {
+  clearTimeout(roomChatRefreshTimer);
+  clearTimeout(subjectChatRefreshTimer);
+  roomChatRefreshTimer = null;
+  subjectChatRefreshTimer = null;
+  const channels = [state.chatChannel, state.subjectChatChannel, notificationChannel].filter(Boolean);
+  state.chatChannel = null;
+  state.subjectChatChannel = null;
+  notificationChannel = null;
+  await Promise.all(channels.map((channel) => supabase.removeChannel(channel)));
+  roomChatLoadVersion++;
+  subjectChatLoadVersion++;
+  memoriesLoadVersion++;
+  roomSelectionVersion++;
+  semestersLoadVersion++;
+  subjectsLoadVersion++;
+  subjectFilesLoadVersion++;
 }
 
 function showSignedOut() {
   state.profile = null;
   state.rooms = [];
   state.room = null;
+  state.role = "member";
+  state.semesters = [];
+  state.semester = null;
+  state.subjects = [];
+  state.subject = null;
+  state.replyTo = null;
+  state.subjectReplyTo = null;
   $("#auth-screen").hidden = false;
   $("#workspace").hidden = true;
   $("#account-area").hidden = true;
 }
 
-async function onSignedIn() {
+async function onSignedIn(expectedUserId = state.user?.id) {
   $("#auth-screen").hidden = true;
   $("#workspace").hidden = false;
   $("#account-area").hidden = false;
-  const { data: profile, error } = await supabase.from("profiles").select("id,display_name,birth_month,birth_day").eq("id", state.user.id).maybeSingle();
+  const { data: profile, error } = await supabase.from("profiles").select("id,display_name,birth_month,birth_day").eq("id", expectedUserId).maybeSingle();
+  if (state.user?.id !== expectedUserId) return;
   if (error) return toast(error.message);
   state.profile = profile;
   if (!profile) {
@@ -121,7 +159,7 @@ async function onSignedIn() {
   }
   updateAccount();
   await loadRooms();
-  subscribeNotifications();
+  if (state.user?.id === expectedUserId) subscribeNotifications();
 }
 
 function updateAccount() {
@@ -339,14 +377,22 @@ function renderRoomList() {
 }
 
 async function selectRoom(room) {
-  if (state.chatChannel) {
-    await supabase.removeChannel(state.chatChannel);
-    state.chatChannel = null;
-  }
-  if (state.subjectChatChannel) {
-    await supabase.removeChannel(state.subjectChatChannel);
-    state.subjectChatChannel = null;
-  }
+  const selectionVersion = ++roomSelectionVersion;
+  const oldChannels = [state.chatChannel, state.subjectChatChannel].filter(Boolean);
+  state.chatChannel = null;
+  state.subjectChatChannel = null;
+  clearTimeout(roomChatRefreshTimer);
+  clearTimeout(subjectChatRefreshTimer);
+  roomChatRefreshTimer = null;
+  subjectChatRefreshTimer = null;
+  roomChatLoadVersion++;
+  subjectChatLoadVersion++;
+  memoriesLoadVersion++;
+  semestersLoadVersion++;
+  subjectsLoadVersion++;
+  subjectFilesLoadVersion++;
+  await Promise.all(oldChannels.map((channel) => supabase.removeChannel(channel)));
+  if (selectionVersion !== roomSelectionVersion) return;
   state.room = room;
   state.replyTo = null;
   state.subjectReplyTo = null;
@@ -354,7 +400,10 @@ async function selectRoom(room) {
   state.subject = null;
   renderRoomList();
   if (!room) return showRoom(null);
-  const { data: membership, error: memberError } = await supabase.from("room_members").select("role").eq("room_id", room.id).eq("user_id", state.user.id).single();
+  const userId = state.user?.id;
+  if (!userId) return;
+  const { data: membership, error: memberError } = await supabase.from("room_members").select("role").eq("room_id", room.id).eq("user_id", userId).single();
+  if (selectionVersion !== roomSelectionVersion || state.room?.id !== room.id) return;
   if (memberError) return toast(memberError.message);
   state.role = membership.role;
   showRoom(room);
@@ -387,13 +436,17 @@ async function getRoomStorageUsage() {
 
 async function refreshRoomStorage() {
   if (!state.room) return;
+  const roomId = state.room.id;
   try {
     const usage = await getRoomStorageUsage();
+    if (state.room?.id !== roomId) return;
     const percent = Math.min(100, usage / ROOM_STORAGE_LIMIT * 100);
     $("#storage-label").textContent = `Room files · ${formatBytes(usage)} / 100 MB`;
     $("#storage-fill").style.width = `${percent}%`;
     $("#storage-fill").setAttribute("aria-valuenow", String(Math.round(percent)));
-  } catch (error) { toast(error.message); }
+  } catch (error) {
+    if (state.room?.id === roomId) toast(error.message);
+  }
 }
 
 async function canUploadToRoom(file) {
@@ -446,7 +499,8 @@ async function exportRoomBackup() {
     link.href = url;
     link.download = `${state.room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirithub-backup.zip`;
     link.click();
-    URL.revokeObjectURL(url);
+    // Let mobile browsers begin reading the generated archive before releasing its URL.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
     toast("Room backup downloaded.");
   } catch (error) {
     toast(`Backup failed: ${error.message}`);
@@ -465,8 +519,21 @@ async function loadMemberCount() {
 
 $("#copy-room-id").addEventListener("click", async () => {
   if (!state.room) return;
-  await navigator.clipboard.writeText(state.room.room_code);
-  toast("Room ID copied.");
+  try {
+    await navigator.clipboard.writeText(state.room.room_code);
+    toast("Room ID copied.");
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = state.room.room_code;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    toast(copied ? "Room ID copied." : `Copy this room ID: ${state.room.room_code}`);
+  }
 });
 
 $("#manage-members").addEventListener("click", async () => {
@@ -586,7 +653,11 @@ $("#semester-form").addEventListener("submit", async (event) => {
 });
 
 async function loadSemesters(selectName) {
-  const { data, error } = await supabase.from("semesters").select("id,name,position").eq("room_id", state.room.id).order("position").order("created_at");
+  if (!state.room) return;
+  const roomId = state.room.id;
+  const loadVersion = ++semestersLoadVersion;
+  const { data, error } = await supabase.from("semesters").select("id,name,position").eq("room_id", roomId).order("position").order("created_at");
+  if (state.room?.id !== roomId || loadVersion !== semestersLoadVersion) return;
   if (error) return toast(error.message);
   state.semesters = data || [];
   if (!state.semesters.length) {
@@ -645,9 +716,13 @@ $("#subject-form").addEventListener("submit", async (event) => {
 });
 
 async function loadSubjects() {
-  if (!state.semester) return;
+  if (!state.semester || !state.room) return;
+  const semesterId = state.semester.id;
+  const roomId = state.room.id;
+  const loadVersion = ++subjectsLoadVersion;
   $("#subjects-heading").textContent = state.semester.name;
-  const { data, error } = await supabase.from("subjects").select("id,name,course_code").eq("semester_id", state.semester.id).order("name");
+  const { data, error } = await supabase.from("subjects").select("id,name,course_code").eq("semester_id", semesterId).order("name");
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId || loadVersion !== subjectsLoadVersion) return;
   if (error) return toast(error.message);
   state.subjects = data || [];
   state.subject = state.subjects.find((item) => item.id === state.subject?.id) || state.subjects[0] || null;
@@ -739,11 +814,14 @@ $("#delete-subject").addEventListener("click", async () => {
 });
 
 async function loadSubjectFiles() {
-  if (!state.subject) return;
-  if (state.subjectChatChannel) {
-    await supabase.removeChannel(state.subjectChatChannel);
-    state.subjectChatChannel = null;
-  }
+  if (!state.subject || !state.room) return;
+  const subjectId = state.subject.id;
+  const roomId = state.room.id;
+  const loadVersion = ++subjectFilesLoadVersion;
+  const oldChannel = state.subjectChatChannel;
+  state.subjectChatChannel = null;
+  if (oldChannel) await supabase.removeChannel(oldChannel);
+  if (state.subject?.id !== subjectId || state.room?.id !== roomId || loadVersion !== subjectFilesLoadVersion) return;
   const detail = $("#subject-detail");
   detail.replaceChildren();
   const head = document.createElement("div");
@@ -772,7 +850,8 @@ async function loadSubjectFiles() {
   list.className = "subject-files";
   list.id = "current-files";
   detail.append(list);
-  const { data, error } = await supabase.from("subject_files").select("id,room_id,user_id,display_name,storage_path,mime_type,file_size,created_at").eq("subject_id", state.subject.id).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("subject_files").select("id,room_id,user_id,display_name,storage_path,mime_type,file_size,created_at").eq("subject_id", subjectId).order("created_at", { ascending: false });
+  if (state.subject?.id !== subjectId || state.room?.id !== roomId || loadVersion !== subjectFilesLoadVersion || !detail.isConnected) return;
   if (error) return toast(error.message);
   if (!data?.length) {
     const empty = document.createElement("p");
@@ -1157,7 +1236,13 @@ async function openPdfViewer(storagePath, fileName) {
 async function downloadSubjectAttachment(storagePath, fileName) {
   const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 300, { download: fileName });
   if (error) return toast(error.message);
-  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  const link = document.createElement("a");
+  link.href = data.signedUrl;
+  link.download = fileName || "download";
+  link.rel = "noopener noreferrer";
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function buildFileRow(file) {
@@ -1182,7 +1267,13 @@ function buildFileRow(file) {
   download.addEventListener("click", async () => {
     const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(file.storage_path, 300, { download: file.display_name });
     if (error) return toast(error.message);
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    const link = document.createElement("a");
+    link.href = data.signedUrl;
+    link.download = file.display_name;
+    link.rel = "noopener noreferrer";
+    document.body.append(link);
+    link.click();
+    link.remove();
   });
   row.append(type, copy);
   if (isPdfAttachment(file)) {

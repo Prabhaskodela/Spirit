@@ -1594,41 +1594,58 @@ document.addEventListener("click", (event) => {
 $("#gif-file").addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   event.target.value = "";
-  if (!file || !state.room) return;
+  const roomId = state.room?.id;
+  const userId = state.user?.id;
+  if (!file || !roomId || !userId) return;
   if (file.type !== "image/gif") return toast("Choose a GIF image.");
-  if (file.size > 5 * 1024 * 1024) return toast("Chat GIFs must be 5 MB or smaller.");
-  const path = `${state.room.id}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  if (file.size < 1 || file.size > 5 * 1024 * 1024) return toast("Chat GIFs must be between 1 byte and 5 MB.");
+  if (!(await canUploadToRoom(file, roomId))) return;
+  const path = `${roomId}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   setBusy(true);
-  const { error: uploadError } = await supabase.storage.from("spirit-files").upload(path, file, { contentType: "image/gif", upsert: false });
-  if (uploadError) { setBusy(false); return toast(uploadError.message); }
-  const { error } = await supabase.from("messages").insert({ room_id: state.room.id, user_id: state.user.id, body: "", attachment_path: path, attachment_type: "gif" });
-  setBusy(false);
-  if (error) { await supabase.storage.from("spirit-files").remove([path]); return toast(error.message); }
-  await loadMessages();
+  try {
+    const { error: uploadError } = await supabase.storage.from("spirit-files").upload(path, file, { contentType: "image/gif", upsert: false });
+    if (uploadError) return toast(uploadError.message);
+    const { error } = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body: "", attachment_path: path, attachment_type: "gif", file_size: file.size });
+    if (error) {
+      await supabase.storage.from("spirit-files").remove([path]);
+      return toast(error.message);
+    }
+    if (state.room?.id === roomId) await loadMessages();
+    if (state.room?.id === roomId) await refreshRoomStorage();
+  } finally {
+    setBusy(false);
+  }
 });
 
 $("#memory-files").addEventListener("change", async (event) => {
   const files = [...(event.target.files || [])];
   event.target.value = "";
-  if (!state.room || !files.length) return;
+  const roomId = state.room?.id;
+  const userId = state.user?.id;
+  if (!roomId || !userId || !files.length) return;
   for (const file of files) {
     const media_type = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) ? "image" : null;
     if (!media_type) { toast(`Skipping unsupported file: ${file.name}`); continue; }
-    if (file.size > MAX_UPLOAD) { toast(`${file.name} is over the 50 MB limit.`); continue; }
-    if (!(await canUploadToRoom(file))) continue;
-    const path = `${state.room.id}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    if (file.size < 1 || file.size > MAX_UPLOAD) { toast(`${file.name} must be between 1 byte and 50 MB.`); continue; }
+    if (!(await canUploadToRoom(file, roomId))) continue;
+    const path = `${roomId}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     setBusy(true);
-    const { error: uploadError } = await supabase.storage.from("spirit-memories").upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) { setBusy(false); toast(uploadError.message); continue; }
-    const { error } = await supabase.from("memories").insert({ room_id: state.room.id, user_id: state.user.id, storage_path: path, media_type, file_size: file.size, caption: "" });
-    if (error) {
-      await supabase.storage.from("spirit-memories").remove([path]);
-      toast(error.message);
+    try {
+      const { error: uploadError } = await supabase.storage.from("spirit-memories").upload(path, file, { contentType: file.type, upsert: false });
+      if (uploadError) { toast(uploadError.message); continue; }
+      const { error } = await supabase.from("memories").insert({ room_id: roomId, user_id: userId, storage_path: path, media_type, file_size: file.size, caption: "" });
+      if (error) {
+        await supabase.storage.from("spirit-memories").remove([path]);
+        toast(error.message);
+      }
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
-  await loadMemories();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId) {
+    await loadMemories();
+    await refreshRoomStorage();
+  }
 });
 
 async function loadMemories() {

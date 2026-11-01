@@ -1,0 +1,57 @@
+name: Build SpiritHUB Android app
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "hub/**"
+      - "icons/**"
+      - "spirit-wordmark.png"
+      - "mobile/**"
+      - ".github/workflows/android-app.yml"
+  push:
+    paths:
+      - "hub/**"
+      - "icons/**"
+      - "spirit-wordmark.png"
+      - "mobile/**"
+      - ".github/workflows/android-app.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools, platforms;android-35, build-tools;35.0.0"
+      - name: Build the packaged app
+        working-directory: mobile
+        run: |
+          npm ci
+          npm run build:web
+          npx cap sync android
+          cd android
+          ./gradlew assembleDebug --no-daemon
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: spirithub-android-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

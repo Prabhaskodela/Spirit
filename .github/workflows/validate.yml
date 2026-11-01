@@ -1,0 +1,25 @@
+name: Validate SpiritHUB
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "fix/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check app JavaScript syntax
+        run: node --input-type=module --check < app.js
+      - name: Check service worker syntax
+        run: |
+          node --check sw.js
+          node --check hub/sw.js

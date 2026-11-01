@@ -1,5 +1,14 @@
 // Spirited Workspace workspaces: Discord-style class spaces (workspace → semesters → subject channels) on Supabase.
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm";
+let createClient = null;
+try {
+  ({ createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"));
+} catch (primaryError) {
+  try {
+    ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2.117.3?bundle"));
+  } catch (fallbackError) {
+    console.error("Supabase client failed to load from both CDNs", primaryError, fallbackError);
+  }
+}
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 import * as backup from "./backup.js";
@@ -32,7 +41,7 @@ const STICKERS = [
 const LAST_KEY = "spirithub-hub:last";
 const INVITE_KEY = "spirithub-hub:invite";
 
-const configured = /^https:\/\/\S+/.test(SUPABASE_URL) && !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
+const configured = Boolean(createClient) && /^https:\/\/\S+/.test(SUPABASE_URL) && !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.startsWith("YOUR_");
 const isNativeAndroid = navigator.userAgent.includes("SpiritHUBAndroid");
 const NATIVE_AUTH_REDIRECT = "spirithub://auth/callback";
 const nativeRuntimePromise = isNativeAndroid ? import("./native-runtime.js") : Promise.resolve(null);
@@ -3516,6 +3525,10 @@ window.addEventListener("hashchange", async () => {
 
 if (!configured) {
   $("setup").hidden = false;
+  if (!createClient) {
+    $("setup").querySelector("h1").textContent = "Workspace services could not load";
+    $("setup").querySelector(".steps").replaceChildren(el("li", { text: "Refresh this page. If the workspace still does not load, allow access to the app’s Supabase CDN and reload." }));
+  }
 } else {
   if (!readInviteFromUrl()) state.invite = session.get(INVITE_KEY);
   let sessionQueue = Promise.resolve();

@@ -823,6 +823,17 @@ async function loadSubjectChat() {
     const { data: reactions } = await supabase.from("chat_reactions").select("id,subject_message_id,user_id,emoji").in("subject_message_id", messages.map((message) => message.id));
     const grouped = groupReactions(reactions || []);
     const messageMap = new Map(messages.map((message) => [message.id, message]));
+    const attachmentUrls = new Map();
+    const attachments = messages.filter((message) => message.attachment_path && !isPdfAttachment(message));
+    for (let index = 0; index < attachments.length; index += 8) {
+      const batch = attachments.slice(index, index + 8);
+      const signedBatch = await Promise.all(batch.map(async (message) => {
+        const { data } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
+        return [message.id, data?.signedUrl || null];
+      }));
+      signedBatch.forEach(([id, url]) => attachmentUrls.set(id, url));
+    }
+    const fragment = document.createDocumentFragment();
     for (const message of messages) {
       const row = document.createElement("article");
       row.className = `subject-message${message.user_id === state.user.id ? " own" : ""}`;
@@ -858,10 +869,10 @@ async function loadSubjectChat() {
           actions.append(preview, save);
           row.append(actions);
         } else {
-          const { data: signed } = await supabase.storage.from("spirit-files").createSignedUrl(message.attachment_path, 3600);
-          if (signed?.signedUrl) {
+          const signedUrl = attachmentUrls.get(message.id);
+          if (signedUrl) {
             const link = document.createElement("a");
-            link.href = signed.signedUrl;
+            link.href = signedUrl;
             link.target = "_blank";
             link.rel = "noopener noreferrer";
             link.textContent = `↓ ${message.attachment_name} · ${formatBytes(message.attachment_size)}`;
@@ -903,8 +914,9 @@ async function loadSubjectChat() {
         actions.append(react);
       }
       row.append(actions);
-      list.append(row);
+      fragment.append(row);
     }
+    list.append(fragment);
   }
   list.scrollTop = list.scrollHeight;
   if (!state.subjectChatChannel) {

@@ -1,14 +1,7 @@
 // Spirited Workspace workspaces: Discord-style class spaces (workspace → semesters → subject channels) on Supabase.
-let createClient = null;
-try {
-  ({ createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm"));
-} catch (primaryError) {
-  try {
-    ({ createClient } = await import("https://esm.sh/@supabase/supabase-js@2.117.3?bundle"));
-  } catch (fallbackError) {
-    console.error("Supabase client failed to load from both CDNs", primaryError, fallbackError);
-  }
-}
+// Supabase is loaded from this site's own origin by index.html. A remote module import here could
+// leave the entire app waiting forever when a CDN is blocked or slow.
+const createClient = window.supabase?.createClient || null;
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 import * as backup from "./backup.js";
@@ -178,6 +171,7 @@ async function copyText(text, done) {
     toast("Couldn't copy. Select the text and copy it instead.");
   }
 }
+
 
 // Supabase reports a write that RLS refused as zero rows changed, not as an error.
 function failed(result, deniedMessage) {
@@ -398,6 +392,9 @@ async function handleSession(user) {
     pruneNotifications();
     checkBirthdays();
   } catch (error) {
+    console.error("Spirit workspace could not finish loading the signed-in account", error);
+    showAuth();
+    authMessage(`Your sign-in is saved, but your workspace could not load: ${friendlyAuthError(error)} Refresh the page to try again.`);
     toast(error.message);
   }
   refreshAi();
@@ -3574,3 +3571,5 @@ if (!configured) {
   }
 }
 
+
+window.spiritAppReady = true;

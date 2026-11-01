@@ -10,6 +10,20 @@
     window.finishSpiritBoot = () => {
       const screen = document.getElementById("spirit-boot");
       if (!screen || screen.classList.contains("is-done")) return;
+      const setup = document.getElementById("setup");
+      const auth = document.getElementById("auth");
+      const app = document.getElementById("app");
+      if (setup?.hidden && auth?.hidden && app?.hidden) {
+        auth.hidden = false;
+        const error = document.getElementById("auth-error");
+        error.hidden = false;
+        error.textContent = "The workspace is taking longer than expected to start. Refresh this page to try again.";
+        document.getElementById("auth-form")?.addEventListener("submit", (event) => {
+          if (window.spiritAppReady) return;
+          event.preventDefault();
+          location.reload();
+        });
+      }
       screen.classList.add("is-done");
       window.setTimeout(() => screen.remove(), 500);
     };
@@ -24,7 +38,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <link rel="stylesheet" href="app.css?v=20261102-brand">
   <link rel="stylesheet" href="premium.css?v=20261101-mobile-fix-1">
-  <script type="module" src="app.js?v=20261102-session-recovery"></script>
+  <script src="vendor/supabase-2.117.3.min.js?v=20261102-local-client"></script>
+  <script type="module" src="app.js?v=20261102-local-client-recovery"></script>
   <script>
     // Register at the app root so the installed web app and its cache share one canonical URL.
     if (!navigator.userAgent.includes("SpiritHUBAndroid") && "serviceWorker" in navigator && location.protocol === "https:") {

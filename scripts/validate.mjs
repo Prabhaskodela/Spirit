@@ -25,6 +25,9 @@ function inspectHtml(path) {
 }
 
 const { html, ids } = inspectHtml("index.html");
+assert.match(html, /vendor\/supabase-2\.117\.3\.min\.js/, "the Supabase client must load from the app origin");
+assert.ok(existsSync("vendor/supabase-2.117.3.min.js"), "the locally hosted Supabase client must exist");
+assert.doesNotMatch(app, /import\(["']https:\/\//, "startup must not wait on a remote Supabase module");
 const staticSelectors = [...app.matchAll(/\$\(["']#([a-zA-Z0-9_-]+)["']\)/g)].map((match) => match[1]);
 const generatedIds = new Set(["message-list", "file-list", "channel-list", "workspace-list"]);
 const missing = [...new Set(staticSelectors.filter((id) => !ids.has(id) && !generatedIds.has(id)))];

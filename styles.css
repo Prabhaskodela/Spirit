@@ -254,3 +254,53 @@ button,a,label{-webkit-tap-highlight-color:transparent}
 @media(prefers-reduced-motion:reduce){
  .pdf-viewer-dialog *, .pdf-viewer-dialog *::before, .pdf-viewer-dialog *::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
 }
+
+/* Mobile interaction polish: keyboard-aware layouts, safe-area spacing and touch-first controls. */
+html, body { max-width: 100%; overflow-x: hidden; }
+button, input, select, textarea, a, label { touch-action: manipulation; }
+.modal { max-height: min(88dvh, calc(var(--app-height, 100dvh) - 24px)); overflow-y: auto; overscroll-behavior: contain; }
+.toast { bottom: max(16px, env(safe-area-inset-bottom)); }
+@media (max-width: 620px) {
+  body, .app-frame { min-height: var(--app-height, 100dvh); }
+  .topbar { padding-top: env(safe-area-inset-top); }
+  .workspace { min-height: 0; }
+  .room-list { max-width: 100%; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .room-item { min-height: 44px; }
+  .room-tabs { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .room-tabs::-webkit-scrollbar, .subject-list::-webkit-scrollbar { display: none; }
+  .room-tab { min-height: 44px; flex: 0 0 auto; }
+  .subject-list { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+  .subject-row { min-height: 44px; }
+  .subject-detail { overflow-wrap: anywhere; }
+  .subject-chat-form { flex-wrap: wrap; }
+  .subject-chat-form input[type="text"] { min-height: 42px; flex-basis: 100%; order: 0; font-size: 16px; }
+  .subject-chat-form .file-upload-label, .subject-chat-form .send-button { min-height: 42px; }
+  .subject-message-list { height: clamp(170px, 28dvh, 260px); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .chat-box { height: clamp(180px, calc(var(--app-height, 100dvh) - 300px), 570px); min-height: 180px; }
+  .message-list, .notification-list, .member-list { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .chat-tools { min-height: 48px; }
+  .chat-tool, .send-button { width: 40px; height: 40px; flex: 0 0 40px; }
+  .chat-tools input[type="text"] { min-height: 42px; font-size: 16px; }
+  .modal { width: min(calc(100vw - 20px), 430px); padding: 24px 18px; }
+  .modal-close { width: 40px; height: 40px; }
+  .primary-button, .secondary-button, .danger-button, .file-upload-label { min-height: 42px; }
+  .file-row { min-width: 0; }
+  .file-copy strong { white-space: normal; overflow-wrap: anywhere; }
+  .file-action { min-width: 42px; min-height: 42px; flex: 0 0 42px; }
+  .memory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .memory-card { content-visibility: auto; contain-intrinsic-size: 220px; }
+  .pdf-viewer-dialog { padding-bottom: env(safe-area-inset-bottom); }
+}
+@media (hover: none) and (pointer: coarse) {
+  .message-actions { opacity: 1; }
+  .message:hover .message-bubble, .message.own:hover .message-bubble,
+  .memory-card:hover, .file-row:hover, .subject-row:hover { transform: none; box-shadow: none; }
+}
+@media (max-width: 380px) {
+  .room-main { padding-inline: 12px; }
+  .section-top { gap: 8px; }
+  .section-top .primary-button { white-space: nowrap; }
+  .room-title-row { gap: 7px; }
+  .chat-tools { gap: 3px; }
+  .chat-tool, .send-button { width: 36px; flex-basis: 36px; }
+}

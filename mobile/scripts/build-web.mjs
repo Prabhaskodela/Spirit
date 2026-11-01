@@ -6,6 +6,7 @@ import { build } from "esbuild";
 const mobileDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repoDir = resolve(mobileDir, "..");
 const webDir = resolve(mobileDir, "www");
+await mkdir(webDir, { recursive: true });
 
 // Package the dedicated /hub/ page as the Android app's launch screen.
 // Its shared app.js, styles.css, config, and image assets remain at the web root.

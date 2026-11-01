@@ -17,7 +17,7 @@ await cp(resolve(repoDir, "assets"), resolve(webDir, "assets"), { recursive: tru
 
 const androidRes = resolve(mobileDir, "android/app/src/main/res");
 for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
-  const mipmapDir = resolve(androidRes, `mipmap-${density}`);
+  const mipmapDir = resolve(androidRes, "mipmap-" + density);
   await mkdir(mipmapDir, { recursive: true });
   await cp(resolve(repoDir, "assets/icons/icon-192.png"), resolve(mipmapDir, "ic_launcher.png"));
   await cp(resolve(repoDir, "assets/icons/icon-192.png"), resolve(mipmapDir, "ic_launcher_round.png"));
@@ -37,7 +37,7 @@ if (!html.includes("<title>Spirited Workspace</title>") || !html.includes('src="
 html = html
   .replace('<link rel="manifest" href="./manifest.json">', "")
   .replaceAll("20261101-profile-settings-2", "android-native-1");
-html = html.replace("</head>", '  <link rel="stylesheet" href="mobile-native.css">\n</head>');
+html = html.replace("</head>", '  <link rel="stylesheet" href="mobile-native.css">\\n</head>');
 await writeFile(htmlPath, html, "utf8");
 
 await build({
@@ -49,4 +49,4 @@ await build({
   target: "es2020",
 });
 
-console.log("Prepared Spirited 
+console.log("Prepared Spirited Workspace at the repository root for Android.");

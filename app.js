@@ -22,6 +22,15 @@ let subjectChatRefreshTimer = null;
 let roomChatLoadVersion = 0;
 let subjectChatLoadVersion = 0;
 let memoriesLoadVersion = 0;
+let roomSelectionVersion = 0;
+let semestersLoadVersion = 0;
+let subjectsLoadVersion = 0;
+let subjectFilesLoadVersion = 0;
+let roomsLoadVersion = 0;
+let memberListLoadVersion = 0;
+let activeRoomMessageIds = new Set();
+let activeSubjectMessageIds = new Set();
+let authHandledUserId;
 
 function scheduleRefresh(callback, kind) {
   const isSubject = kind === "subject";
@@ -84,33 +93,69 @@ $("#google-sign-in").addEventListener("click", async () => {
 });
 
 if (supabase) {
+  const handleAuthSession = async (session) => {
+    const user = session?.user ?? null;
+    const userId = user?.id ?? null;
+    if (userId === authHandledUserId) return;
+    authHandledUserId = userId;
+    state.user = user;
+    if (user) await onSignedIn(userId);
+    else {
+      await clearRealtimeChannels();
+      showSignedOut();
+    }
+  };
   supabase.auth.onAuthStateChange((_event, session) => {
-    queueMicrotask(async () => {
-      state.user = session?.user ?? null;
-      if (state.user) await onSignedIn();
-      else showSignedOut();
-    });
+    queueMicrotask(() => handleAuthSession(session));
   });
-  supabase.auth.getSession().then(({ data }) => {
-    state.user = data.session?.user ?? null;
-    if (state.user) onSignedIn();
-  });
+  // Fallback in case the initial auth event is delayed by the browser.
+  supabase.auth.getSession().then(({ data }) => handleAuthSession(data.session)).catch(() => {});
+}
+
+async function clearRealtimeChannels() {
+  clearTimeout(roomChatRefreshTimer);
+  clearTimeout(subjectChatRefreshTimer);
+  roomChatRefreshTimer = null;
+  subjectChatRefreshTimer = null;
+  const channels = [state.chatChannel, state.subjectChatChannel, notificationChannel].filter(Boolean);
+  state.chatChannel = null;
+  state.subjectChatChannel = null;
+  notificationChannel = null;
+  await Promise.allSettled(channels.map((channel) => supabase.removeChannel(channel)));
+  roomChatLoadVersion++;
+  subjectChatLoadVersion++;
+  activeRoomMessageIds.clear();
+  activeSubjectMessageIds.clear();
+  memoriesLoadVersion++;
+  roomSelectionVersion++;
+  semestersLoadVersion++;
+  subjectsLoadVersion++;
+  subjectFilesLoadVersion++;
 }
 
 function showSignedOut() {
   state.profile = null;
   state.rooms = [];
   state.room = null;
+  state.role = "member";
+  state.semesters = [];
+  state.semester = null;
+  state.subjects = [];
+  state.subject = null;
+  state.replyTo = null;
+  state.subjectReplyTo = null;
   $("#auth-screen").hidden = false;
   $("#workspace").hidden = true;
   $("#account-area").hidden = true;
+  document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
 }
 
-async function onSignedIn() {
+async function onSignedIn(expectedUserId = state.user?.id) {
   $("#auth-screen").hidden = true;
   $("#workspace").hidden = false;
   $("#account-area").hidden = false;
-  const { data: profile, error } = await supabase.from("profiles").select("id,display_name,birth_month,birth_day").eq("id", state.user.id).maybeSingle();
+  const { data: profile, error } = await supabase.from("profiles").select("id,display_name,birth_month,birth_day").eq("id", expectedUserId).maybeSingle();
+  if (state.user?.id !== expectedUserId) return;
   if (error) return toast(error.message);
   state.profile = profile;
   if (!profile) {
@@ -121,7 +166,7 @@ async function onSignedIn() {
   }
   updateAccount();
   await loadRooms();
-  subscribeNotifications();
+  if (state.user?.id === expectedUserId) subscribeNotifications();
 }
 
 function updateAccount() {
@@ -187,7 +232,11 @@ $("#join-room-form").addEventListener("submit", async (event) => {
 });
 
 async function loadRooms(selectId) {
-  const { data: memberships, error: memberError } = await supabase.from("room_members").select("room_id,role").eq("user_id", state.user.id);
+  const userId = state.user?.id;
+  if (!userId) return;
+  const loadVersion = ++roomsLoadVersion;
+  const { data: memberships, error: memberError } = await supabase.from("room_members").select("room_id,role").eq("user_id", userId);
+  if (state.user?.id !== userId || loadVersion !== roomsLoadVersion) return;
   if (memberError) return toast(memberError.message);
   if (!memberships?.length) {
     state.rooms = [];
@@ -198,10 +247,12 @@ async function loadRooms(selectId) {
   }
   const ids = memberships.map((item) => item.room_id);
   const { data: rooms, error } = await supabase.from("rooms").select("id,name,academic_year,room_code,created_by").in("id", ids).order("created_at", { ascending: false });
+  if (state.user?.id !== userId || loadVersion !== roomsLoadVersion) return;
   if (error) return toast(error.message);
   state.rooms = rooms || [];
   renderRoomList();
   await checkBirthdays(ids);
+  if (state.user?.id !== userId || loadVersion !== roomsLoadVersion) return;
   const next = state.rooms.find((room) => room.id === selectId) || state.rooms.find((room) => room.id === state.room?.id) || state.rooms[0];
   await selectRoom(next || null);
 }
@@ -339,14 +390,24 @@ function renderRoomList() {
 }
 
 async function selectRoom(room) {
-  if (state.chatChannel) {
-    await supabase.removeChannel(state.chatChannel);
-    state.chatChannel = null;
-  }
-  if (state.subjectChatChannel) {
-    await supabase.removeChannel(state.subjectChatChannel);
-    state.subjectChatChannel = null;
-  }
+  const selectionVersion = ++roomSelectionVersion;
+  const oldChannels = [state.chatChannel, state.subjectChatChannel].filter(Boolean);
+  state.chatChannel = null;
+  state.subjectChatChannel = null;
+  clearTimeout(roomChatRefreshTimer);
+  clearTimeout(subjectChatRefreshTimer);
+  roomChatRefreshTimer = null;
+  subjectChatRefreshTimer = null;
+  roomChatLoadVersion++;
+  subjectChatLoadVersion++;
+  activeRoomMessageIds.clear();
+  activeSubjectMessageIds.clear();
+  memoriesLoadVersion++;
+  semestersLoadVersion++;
+  subjectsLoadVersion++;
+  subjectFilesLoadVersion++;
+  await Promise.all(oldChannels.map((channel) => supabase.removeChannel(channel)));
+  if (selectionVersion !== roomSelectionVersion) return;
   state.room = room;
   state.replyTo = null;
   state.subjectReplyTo = null;
@@ -354,7 +415,10 @@ async function selectRoom(room) {
   state.subject = null;
   renderRoomList();
   if (!room) return showRoom(null);
-  const { data: membership, error: memberError } = await supabase.from("room_members").select("role").eq("room_id", room.id).eq("user_id", state.user.id).single();
+  const userId = state.user?.id;
+  if (!userId) return;
+  const { data: membership, error: memberError } = await supabase.from("room_members").select("role").eq("room_id", room.id).eq("user_id", userId).single();
+  if (selectionVersion !== roomSelectionVersion || state.room?.id !== room.id) return;
   if (memberError) return toast(memberError.message);
   state.role = membership.role;
   showRoom(room);
@@ -375,30 +439,46 @@ function showRoom(room) {
   refreshRoomStorage();
 }
 
-async function getRoomStorageUsage() {
-  if (!state.room) return 0;
-  const [{ data: files, error: fileError }, { data: memories, error: memoryError }] = await Promise.all([
-    supabase.from("subject_files").select("file_size").eq("room_id", state.room.id),
-    supabase.from("memories").select("file_size").eq("room_id", state.room.id),
+async function getRoomStorageUsage(roomId = state.room?.id) {
+  if (!roomId) return 0;
+  const [{ data: files, error: fileError }, { data: memories, error: memoryError }, { data: gifs, error: gifError }] = await Promise.all([
+    supabase.from("subject_files").select("file_size").eq("room_id", roomId),
+    supabase.from("memories").select("file_size").eq("room_id", roomId),
+    supabase.from("messages").select("attachment_path").eq("room_id", roomId).eq("attachment_type", "gif").not("attachment_path", "is", null),
   ]);
-  if (fileError || memoryError) throw fileError || memoryError;
-  return [...(files || []), ...(memories || [])].reduce((sum, row) => sum + Number(row.file_size || 0), 0);
+  if (fileError || memoryError || gifError) throw fileError || memoryError || gifError;
+  let gifBytes = 0;
+  if (gifs?.length) {
+    const { data: objects, error: storageError } = await supabase.storage.from("spirit-files").list(roomId, { limit: 1000 });
+    if (storageError) throw storageError;
+    const gifPaths = new Set(gifs.map((message) => message.attachment_path));
+    for (const object of objects || []) {
+      if (gifPaths.has(`${roomId}/${object.name}`)) {
+        gifBytes += Number(object.metadata?.size || object.metadata?.contentLength || 0);
+      }
+    }
+  }
+  return [...(files || []), ...(memories || [])].reduce((sum, row) => sum + Number(row.file_size || 0), gifBytes);
 }
 
 async function refreshRoomStorage() {
   if (!state.room) return;
+  const roomId = state.room.id;
   try {
     const usage = await getRoomStorageUsage();
+    if (state.room?.id !== roomId) return;
     const percent = Math.min(100, usage / ROOM_STORAGE_LIMIT * 100);
     $("#storage-label").textContent = `Room files · ${formatBytes(usage)} / 100 MB`;
     $("#storage-fill").style.width = `${percent}%`;
     $("#storage-fill").setAttribute("aria-valuenow", String(Math.round(percent)));
-  } catch (error) { toast(error.message); }
+  } catch (error) {
+    if (state.room?.id === roomId) toast(error.message);
+  }
 }
 
-async function canUploadToRoom(file) {
+async function canUploadToRoom(file, roomId = state.room?.id) {
   try {
-    const used = await getRoomStorageUsage();
+    const used = await getRoomStorageUsage(roomId);
     if (used + file.size > ROOM_STORAGE_LIMIT) {
       toast("This room is at its 100 MB storage limit. Ask the admin to clear old files.");
       return false;
@@ -412,10 +492,11 @@ async function exportRoomBackup() {
   if (!state.room) return;
   setBusy(true);
   try {
+    const room = { ...state.room };
     const tables = ["semesters", "subject_files", "subject_messages", "messages", "memories"];
-    const manifest = { exported_at: new Date().toISOString(), room: { id: state.room.id, name: state.room.name, academic_year: state.room.academic_year, room_code: state.room.room_code }, contents: {} };
+    const manifest = { exported_at: new Date().toISOString(), room: { id: room.id, name: room.name, academic_year: room.academic_year, room_code: room.room_code }, contents: {} };
     for (const table of tables) {
-      const { data, error } = await supabase.from(table).select("*").eq("room_id", state.room.id);
+      const { data, error } = await supabase.from(table).select("*").eq("room_id", room.id);
       if (error) throw error;
       manifest.contents[table] = data || [];
     }
@@ -444,9 +525,10 @@ async function exportRoomBackup() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${state.room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirithub-backup.zip`;
+    link.download = `${room.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-spirithub-backup.zip`;
     link.click();
-    URL.revokeObjectURL(url);
+    // Let mobile browsers begin reading the generated archive before releasing its URL.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
     toast("Room backup downloaded.");
   } catch (error) {
     toast(`Backup failed: ${error.message}`);
@@ -454,8 +536,10 @@ async function exportRoomBackup() {
 }
 
 async function loadMemberCount() {
-  const { data, error } = await supabase.from("room_members").select("user_id,role").eq("room_id", state.room.id);
-  if (!error) {
+  if (!state.room) return;
+  const roomId = state.room.id;
+  const { data, error } = await supabase.from("room_members").select("user_id,role").eq("room_id", roomId);
+  if (!error && state.room?.id === roomId) {
     const count = data?.length || 0;
     $("#member-line").textContent = `${count} ${count === 1 ? "member" : "members"} · your shared class space`;
     $("#member-count-label").textContent = count;
@@ -465,8 +549,21 @@ async function loadMemberCount() {
 
 $("#copy-room-id").addEventListener("click", async () => {
   if (!state.room) return;
-  await navigator.clipboard.writeText(state.room.room_code);
-  toast("Room ID copied.");
+  try {
+    await navigator.clipboard.writeText(state.room.room_code);
+    toast("Room ID copied.");
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = state.room.room_code;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    toast(copied ? "Room ID copied." : `Copy this room ID: ${state.room.room_code}`);
+  }
 });
 
 $("#manage-members").addEventListener("click", async () => {
@@ -476,11 +573,16 @@ $("#manage-members").addEventListener("click", async () => {
 });
 
 async function loadMembers() {
+  if (!state.room) return;
+  const roomId = state.room.id;
+  const loadVersion = ++memberListLoadVersion;
   const list = $("#member-list");
   list.replaceChildren();
-  const { data: memberships, error } = await supabase.from("room_members").select("user_id,role,joined_at").eq("room_id", state.room.id).order("joined_at");
+  const { data: memberships, error } = await supabase.from("room_members").select("user_id,role,joined_at").eq("room_id", roomId).order("joined_at");
+  if (state.room?.id !== roomId || loadVersion !== memberListLoadVersion || !list.isConnected) return;
   if (error) return toast(error.message);
   const names = await loadProfiles((memberships || []).map((member) => member.user_id));
+  if (state.room?.id !== roomId || loadVersion !== memberListLoadVersion || !list.isConnected) return;
   for (const member of memberships || []) {
     const row = document.createElement("div");
     row.className = "member-row";
@@ -502,10 +604,14 @@ async function loadMembers() {
       remove.textContent = "Remove";
       remove.addEventListener("click", async () => {
         if (!confirm(`Remove ${name} from this room? They will lose access to its shared content.`)) return;
-        const { error: removeError } = await supabase.from("room_members").delete().eq("room_id", state.room.id).eq("user_id", member.user_id);
+        const roomId = state.room?.id;
+        if (!roomId) return;
+        const { error: removeError } = await supabase.from("room_members").delete().eq("room_id", roomId).eq("user_id", member.user_id);
         if (removeError) return toast(removeError.message);
-        await loadMembers();
-        await loadMemberCount();
+        if (state.room?.id === roomId) {
+          await loadMembers();
+          await loadMemberCount();
+        }
         toast("Member removed from this room.");
       });
       row.append(remove);
@@ -532,18 +638,23 @@ $("#manage-semester").addEventListener("click", () => {
 });
 
 async function renameSemester(name) {
-  if (!name || !state.semester) return;
-  const { error } = await supabase.from("semesters").update({ name }).eq("id", state.semester.id);
+  if (!name || !state.semester || state.role !== "admin") return;
+  const semesterId = state.semester.id;
+  const roomId = state.room?.id;
+  const { error } = await supabase.from("semesters").update({ name }).eq("id", semesterId);
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId) return;
   state.semester.name = name;
   await loadSemesters(name);
   toast("Semester renamed.");
 }
 
 async function deleteSemester() {
-  if (!state.semester || state.role !== "admin") return;
-  if (!confirm(`Delete ${state.semester.name}, all its subjects, chats, and files? This cannot be undone.`)) return;
-  const { data: subjects, error: subjectError } = await supabase.from("subjects").select("id").eq("semester_id", state.semester.id);
+  if (!state.semester || state.role !== "admin" || !state.room) return;
+  const semester = { ...state.semester };
+  const roomId = state.room.id;
+  if (!confirm(`Delete ${semester.name}, all its subjects, chats, and files? This cannot be undone.`)) return;
+  const { data: subjects, error: subjectError } = await supabase.from("subjects").select("id").eq("semester_id", semester.id);
   if (subjectError) return toast(subjectError.message);
   const ids = (subjects || []).map((item) => item.id);
   let paths = [];
@@ -558,11 +669,13 @@ async function deleteSemester() {
     const { error } = await supabase.storage.from("spirit-files").remove(paths);
     if (error) return toast(error.message);
   }
-  const { error } = await supabase.from("semesters").delete().eq("id", state.semester.id);
+  const { error } = await supabase.from("semesters").delete().eq("id", semester.id);
   if (error) return toast(error.message);
-  state.semester = null;
-  await loadSemesters();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId && state.semester?.id === semester.id) {
+    state.semester = null;
+    await loadSemesters();
+    await refreshRoomStorage();
+  }
   toast("Semester and its contents were removed.");
 }
 $("#save-semester-name").addEventListener("click", async () => {
@@ -577,8 +690,11 @@ $("#semester-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const name = $("#new-semester-name").value.trim();
   if (!name || !state.room || state.role !== "admin") return;
-  const { error } = await supabase.from("semesters").insert({ room_id: state.room.id, name, position: state.semesters.length });
+  const roomId = state.room.id;
+  const position = state.semesters.length;
+  const { error } = await supabase.from("semesters").insert({ room_id: roomId, name, position });
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId) return;
   $("#semester-dialog").close();
   $("#semester-form").reset();
   await loadSemesters(name);
@@ -586,12 +702,17 @@ $("#semester-form").addEventListener("submit", async (event) => {
 });
 
 async function loadSemesters(selectName) {
-  const { data, error } = await supabase.from("semesters").select("id,name,position").eq("room_id", state.room.id).order("position").order("created_at");
+  if (!state.room) return;
+  const roomId = state.room.id;
+  const loadVersion = ++semestersLoadVersion;
+  const { data, error } = await supabase.from("semesters").select("id,name,position").eq("room_id", roomId).order("position").order("created_at");
+  if (state.room?.id !== roomId || loadVersion !== semestersLoadVersion) return;
   if (error) return toast(error.message);
   state.semesters = data || [];
   if (!state.semesters.length) {
     if (state.role === "admin") {
-      const { error: insertError } = await supabase.from("semesters").insert({ room_id: state.room.id, name: "Semester 1", position: 0 });
+      const { error: insertError } = await supabase.from("semesters").insert({ room_id: roomId, name: "Semester 1", position: 0 });
+      if (state.room?.id !== roomId || loadVersion !== semestersLoadVersion) return;
       if (insertError) return toast(insertError.message);
       return loadSemesters("Semester 1");
     }
@@ -621,6 +742,7 @@ function renderSemesterSelect() {
 $("#semester-select").addEventListener("change", async (event) => {
   state.semester = state.semesters.find((item) => item.id === event.target.value) || null;
   state.subject = null;
+  state.subjectReplyTo = null;
   await loadSubjects();
 });
 
@@ -630,11 +752,15 @@ $("#add-subject").addEventListener("click", () => {
 });
 $("#subject-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!state.semester || state.role !== "admin") return;
+  if (!state.semester || state.role !== "admin" || !state.room) return;
+  const semesterId = state.semester.id;
+  const roomId = state.room.id;
   const name = $("#new-subject-name").value.trim();
   const course_code = $("#new-subject-code").value.trim();
-  const { data, error } = await supabase.from("subjects").insert({ semester_id: state.semester.id, name, course_code }).select().single();
+  if (!name) return;
+  const { data, error } = await supabase.from("subjects").insert({ semester_id: semesterId, name, course_code }).select().single();
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId) return;
   $("#subject-dialog").close();
   $("#subject-form").reset();
   state.subjects.push(data);
@@ -645,12 +771,18 @@ $("#subject-form").addEventListener("submit", async (event) => {
 });
 
 async function loadSubjects() {
-  if (!state.semester) return;
+  if (!state.semester || !state.room) return;
+  const semesterId = state.semester.id;
+  const roomId = state.room.id;
+  const loadVersion = ++subjectsLoadVersion;
   $("#subjects-heading").textContent = state.semester.name;
-  const { data, error } = await supabase.from("subjects").select("id,name,course_code").eq("semester_id", state.semester.id).order("name");
+  const { data, error } = await supabase.from("subjects").select("id,name,course_code").eq("semester_id", semesterId).order("name");
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId || loadVersion !== subjectsLoadVersion) return;
   if (error) return toast(error.message);
   state.subjects = data || [];
-  state.subject = state.subjects.find((item) => item.id === state.subject?.id) || state.subjects[0] || null;
+  const previousSubjectId = state.subject?.id;
+  state.subject = state.subjects.find((item) => item.id === previousSubjectId) || state.subjects[0] || null;
+  if (state.subject?.id !== previousSubjectId) state.subjectReplyTo = null;
   renderSubjects();
   if (state.subject) await loadSubjectFiles();
 }
@@ -676,6 +808,7 @@ function renderSubjects() {
     button.append(icon, copy);
     button.addEventListener("click", async () => {
       state.subject = subject;
+      state.subjectReplyTo = null;
       renderSubjects();
       await loadSubjectFiles();
     });
@@ -705,12 +838,16 @@ function renderSubjects() {
 }
 
 $("#save-subject").addEventListener("click", async () => {
-  if (!state.subject || state.role !== "admin") return;
+  if (!state.subject || state.role !== "admin" || !state.room) return;
+  const subjectId = state.subject.id;
+  const roomId = state.room.id;
+  const semesterId = state.semester?.id;
   const name = $("#rename-subject").value.trim();
   const course_code = $("#rename-subject-code").value.trim();
   if (!name) return toast("Subject name is required.");
-  const { error } = await supabase.from("subjects").update({ name, course_code }).eq("id", state.subject.id);
+  const { error } = await supabase.from("subjects").update({ name, course_code }).eq("id", subjectId);
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId || state.semester?.id !== semesterId || state.subject?.id !== subjectId) return;
   $("#manage-subject-dialog").close();
   await loadSubjects();
   toast("Subject updated.");
@@ -718,7 +855,9 @@ $("#save-subject").addEventListener("click", async () => {
 
 $("#delete-subject").addEventListener("click", async () => {
   if (!state.subject || state.role !== "admin") return;
-  const subject = state.subject;
+  const subject = { ...state.subject };
+  const roomId = state.room?.id;
+  const semesterId = state.semester?.id;
   if (!confirm(`Delete ${subject.name}, its subject chat, and all shared files? This cannot be undone.`)) return;
   const { data: files, error: fileError } = await supabase.from("subject_files").select("storage_path").eq("subject_id", subject.id);
   if (fileError) return toast(fileError.message);
@@ -731,19 +870,24 @@ $("#delete-subject").addEventListener("click", async () => {
   }
   const { error } = await supabase.from("subjects").delete().eq("id", subject.id);
   if (error) return toast(error.message);
-  $("#manage-subject-dialog").close();
-  state.subject = null;
-  await loadSubjects();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId && state.semester?.id === semesterId && state.subject?.id === subject.id) {
+    $("#manage-subject-dialog").close();
+    state.subject = null;
+    await loadSubjects();
+    await refreshRoomStorage();
+  }
   toast("Subject and its content were removed.");
 });
 
 async function loadSubjectFiles() {
-  if (!state.subject) return;
-  if (state.subjectChatChannel) {
-    await supabase.removeChannel(state.subjectChatChannel);
-    state.subjectChatChannel = null;
-  }
+  if (!state.subject || !state.room) return;
+  const subjectId = state.subject.id;
+  const roomId = state.room.id;
+  const loadVersion = ++subjectFilesLoadVersion;
+  const oldChannel = state.subjectChatChannel;
+  state.subjectChatChannel = null;
+  if (oldChannel) await supabase.removeChannel(oldChannel);
+  if (state.subject?.id !== subjectId || state.room?.id !== roomId || loadVersion !== subjectFilesLoadVersion) return;
   const detail = $("#subject-detail");
   detail.replaceChildren();
   const head = document.createElement("div");
@@ -772,7 +916,8 @@ async function loadSubjectFiles() {
   list.className = "subject-files";
   list.id = "current-files";
   detail.append(list);
-  const { data, error } = await supabase.from("subject_files").select("id,room_id,user_id,display_name,storage_path,mime_type,file_size,created_at").eq("subject_id", state.subject.id).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("subject_files").select("id,room_id,user_id,display_name,storage_path,mime_type,file_size,created_at").eq("subject_id", subjectId).order("created_at", { ascending: false });
+  if (state.subject?.id !== subjectId || state.room?.id !== roomId || loadVersion !== subjectFilesLoadVersion || !detail.isConnected) return;
   if (error) return toast(error.message);
   if (!data?.length) {
     const empty = document.createElement("p");
@@ -838,9 +983,11 @@ async function loadSubjectChat() {
   const loadVersion = ++subjectChatLoadVersion;
   const list = $("#subject-message-list");
   if (!list) return;
-  const { data: messages, error } = await supabase.from("subject_messages").select("id,subject_id,room_id,user_id,body,attachment_path,attachment_name,attachment_type,attachment_size,reply_to_id,created_at").eq("subject_id", state.subject.id).order("created_at", { ascending: true }).limit(100);
+  const { data: messages, error } = await supabase.from("subject_messages").select("id,subject_id,room_id,user_id,body,attachment_path,attachment_name,attachment_type,attachment_size,reply_to_id,created_at").eq("subject_id", subjectId).order("created_at", { ascending: false }).limit(100);
   if (error) return toast(error.message);
   if (state.subject?.id !== subjectId || loadVersion !== subjectChatLoadVersion || !list.isConnected) return;
+  messages?.reverse();
+  activeSubjectMessageIds = new Set((messages || []).map((message) => message.id));
   list.replaceChildren();
   if (!messages?.length) {
     const empty = document.createElement("p");
@@ -953,28 +1100,39 @@ async function loadSubjectChat() {
   if (state.subject?.id !== subjectId || loadVersion !== subjectChatLoadVersion || !list.isConnected) return;
   list.scrollTop = list.scrollHeight;
   if (!state.subjectChatChannel) {
-    state.subjectChatChannel = supabase.channel(`subject-chat-${subjectId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "subject_messages", filter: `subject_id=eq.${subjectId}` }, () => scheduleRefresh(loadSubjectChat, "subject")).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => scheduleRefresh(loadSubjectChat, "subject")).subscribe();
+    state.subjectChatChannel = supabase.channel(`subject-chat-${subjectId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "subject_messages", filter: `subject_id=eq.${subjectId}` }, (payload) => {
+        if (payload.new?.user_id !== state.user?.id) scheduleRefresh(loadSubjectChat, "subject");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, (payload) => {
+        const reaction = payload.new?.subject_message_id ? payload.new : payload.old;
+        if (reaction?.user_id !== state.user?.id && activeSubjectMessageIds.has(reaction?.subject_message_id)) scheduleRefresh(loadSubjectChat, "subject");
+      }).subscribe();
   }
 }
 
 async function sendSubjectMessage(event) {
   event.preventDefault();
   if (!state.subject || !state.room) return;
-  const body = $("#subject-chat-input").value.trim();
-  const file = $("#subject-chat-attachment").files?.[0];
+  const form = event.currentTarget;
+  const roomId = state.room.id;
+  const subject = { ...state.subject };
+  const userId = state.user.id;
+  const body = form.querySelector("#subject-chat-input").value.trim();
+  const file = form.querySelector("#subject-chat-attachment").files?.[0];
   if (!body && !file) return;
   if (file && file.size > MAX_UPLOAD) return toast("Files must be 50 MB or smaller.");
   if (file && !(file.type === "application/pdf" || ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type))) return toast("Only PDFs and images can be shared here.");
-  if (file && !(await canUploadToRoom(file))) return;
+  if (file && !(await canUploadToRoom(file, roomId))) return;
   let attachment_path = null;
   if (file) {
-    attachment_path = `${state.room.id}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    attachment_path = `${roomId}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const { error } = await supabase.storage.from("spirit-files").upload(attachment_path, file, { contentType: file.type, upsert: false });
     if (error) return toast(error.message);
   }
-  const row = { subject_id: state.subject.id, room_id: state.room.id, user_id: state.user.id, body, attachment_path, attachment_name: file?.name || null, attachment_type: file?.type || null, attachment_size: file?.size || null, reply_to_id: state.subjectReplyTo?.id || null };
+  const row = { subject_id: subject.id, room_id: roomId, user_id: userId, body, attachment_path, attachment_name: file?.name || null, attachment_type: file?.type || null, attachment_size: file?.size || null, reply_to_id: state.subjectReplyTo?.id || null };
   if (file) {
-    const { error: indexError } = await supabase.from("subject_files").insert({ subject_id: state.subject.id, room_id: state.room.id, user_id: state.user.id, display_name: file.name, storage_path: attachment_path, mime_type: file.type, file_size: file.size });
+    const { error: indexError } = await supabase.from("subject_files").insert({ subject_id: subject.id, room_id: roomId, user_id: userId, display_name: file.name, storage_path: attachment_path, mime_type: file.type, file_size: file.size });
     if (indexError) {
       await supabase.storage.from("spirit-files").remove([attachment_path]);
       return toast(indexError.message);
@@ -986,13 +1144,17 @@ async function sendSubjectMessage(event) {
     if (attachment_path) await supabase.storage.from("spirit-files").remove([attachment_path]);
     return toast(error.message);
   }
-  $("#subject-chat-input").value = "";
-  state.subjectReplyTo = null;
-  $("#subject-reply-context").hidden = true;
-  $("#subject-chat-attachment").value = "";
-  $(".subject-chat-form .file-upload-label").textContent = "PDF / image";
-  await loadSubjectFiles();
-  await refreshRoomStorage();
+  if (form.isConnected) {
+    form.querySelector("#subject-chat-input").value = "";
+    form.querySelector("#subject-chat-attachment").value = "";
+    form.querySelector(".file-upload-label").textContent = "PDF / image";
+  }
+  if (state.room?.id === roomId && state.subject?.id === subject.id) {
+    state.subjectReplyTo = null;
+    $("#subject-reply-context").hidden = true;
+    await loadSubjectFiles();
+  }
+  if (state.room?.id === roomId) await refreshRoomStorage();
 }
 
 function formatBytes(bytes) {
@@ -1157,7 +1319,13 @@ async function openPdfViewer(storagePath, fileName) {
 async function downloadSubjectAttachment(storagePath, fileName) {
   const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(storagePath, 300, { download: fileName });
   if (error) return toast(error.message);
-  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  const link = document.createElement("a");
+  link.href = data.signedUrl;
+  link.download = fileName || "download";
+  link.rel = "noopener noreferrer";
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function buildFileRow(file) {
@@ -1182,7 +1350,13 @@ function buildFileRow(file) {
   download.addEventListener("click", async () => {
     const { data, error } = await supabase.storage.from("spirit-files").createSignedUrl(file.storage_path, 300, { download: file.display_name });
     if (error) return toast(error.message);
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    const link = document.createElement("a");
+    link.href = data.signedUrl;
+    link.download = file.display_name;
+    link.rel = "noopener noreferrer";
+    document.body.append(link);
+    link.click();
+    link.remove();
   });
   row.append(type, copy);
   if (isPdfAttachment(file)) {
@@ -1211,14 +1385,17 @@ function buildFileRow(file) {
 
 async function uploadSubjectFile(file) {
   if (!file || !state.subject || !state.room) return;
-  if (file.size > MAX_UPLOAD) return toast("Files must be 50 MB or smaller on the free plan.");
-  if (!(await canUploadToRoom(file))) return;
+  const roomId = state.room.id;
+  const subjectId = state.subject.id;
+  const userId = state.user.id;
+  if (file.size < 1 || file.size > MAX_UPLOAD) return toast("Files must be between 1 byte and 50 MB.");
+  if (!(await canUploadToRoom(file, roomId))) return;
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const path = `${state.room.id}/${crypto.randomUUID()}_${safeName}`;
+  const path = `${roomId}/${crypto.randomUUID()}_${safeName}`;
   setBusy(true);
   const { error: uploadError } = await supabase.storage.from("spirit-files").upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
   if (uploadError) { setBusy(false); return toast(uploadError.message); }
-  const { error } = await supabase.from("subject_files").insert({ subject_id: state.subject.id, room_id: state.room.id, user_id: state.user.id, display_name: file.name, storage_path: path, mime_type: file.type || "application/octet-stream", file_size: file.size });
+  const { error } = await supabase.from("subject_files").insert({ subject_id: subjectId, room_id: roomId, user_id: userId, display_name: file.name, storage_path: path, mime_type: file.type || "application/octet-stream", file_size: file.size });
   if (error) {
     await supabase.storage.from("spirit-files").remove([path]);
     setBusy(false);
@@ -1226,8 +1403,8 @@ async function uploadSubjectFile(file) {
   }
   setBusy(false);
   toast("File shared with the room.");
-  await loadSubjectFiles();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId && state.subject?.id === subjectId) await loadSubjectFiles();
+  if (state.room?.id === roomId) await refreshRoomStorage();
 }
 
 async function removeSubjectFile(file) {
@@ -1257,9 +1434,11 @@ async function loadMessages() {
   const roomId = state.room.id;
   const loadVersion = ++roomChatLoadVersion;
   const list = $("#message-list");
-  const { data: messages, error } = await supabase.from("messages").select("id,room_id,user_id,body,message_kind,attachment_path,attachment_type,reply_to_id,created_at").eq("room_id", state.room.id).order("created_at", { ascending: true }).limit(100);
+  const { data: messages, error } = await supabase.from("messages").select("id,room_id,user_id,body,message_kind,attachment_path,attachment_type,reply_to_id,created_at").eq("room_id", roomId).order("created_at", { ascending: false }).limit(100);
   if (error) return toast(error.message);
   if (state.room?.id !== roomId || loadVersion !== roomChatLoadVersion || $("#chat-section").hidden) return;
+  messages?.reverse();
+  activeRoomMessageIds = new Set((messages || []).map((message) => message.id));
   list.replaceChildren();
   if (!messages?.length) {
     const placeholder = document.createElement("div");
@@ -1299,7 +1478,14 @@ async function loadMessages() {
   if (state.room?.id !== roomId || loadVersion !== roomChatLoadVersion || $("#chat-section").hidden) return;
   list.scrollTop = list.scrollHeight;
   if (!state.chatChannel) {
-    state.chatChannel = supabase.channel(`room-chat-${roomId}`).on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` }, () => scheduleRefresh(loadMessages, "room")).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => scheduleRefresh(loadMessages, "room")).subscribe();
+    state.chatChannel = supabase.channel(`room-chat-${roomId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` }, (payload) => {
+        if (payload.new?.user_id !== state.user?.id) scheduleRefresh(loadMessages, "room");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, (payload) => {
+        const reaction = payload.new?.message_id ? payload.new : payload.old;
+        if (reaction?.user_id !== state.user?.id && activeRoomMessageIds.has(reaction?.message_id)) scheduleRefresh(loadMessages, "room");
+      }).subscribe();
   }
 }
 
@@ -1426,10 +1612,14 @@ async function toggleReaction(target, emoji) {
 
 $("#chat-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+  const roomId = state.room?.id;
+  const userId = state.user?.id;
   const body = $("#chat-input").value.trim();
-  if (!body || !state.room) return;
-  const { error } = await supabase.from("messages").insert({ room_id: state.room.id, user_id: state.user.id, body, message_kind: "text", reply_to_id: state.replyTo?.id || null });
+  if (!body || !roomId || !userId) return;
+  const replyToId = state.replyTo?.id || null;
+  const { error } = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body, message_kind: "text", reply_to_id: replyToId });
   if (error) return toast(error.message);
+  if (state.room?.id !== roomId) return;
   $("#chat-input").value = "";
   state.replyTo = null;
   $("#reply-context").hidden = true;
@@ -1479,41 +1669,63 @@ document.addEventListener("click", (event) => {
 $("#gif-file").addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   event.target.value = "";
-  if (!file || !state.room) return;
+  const roomId = state.room?.id;
+  const userId = state.user?.id;
+  if (!file || !roomId || !userId) return;
   if (file.type !== "image/gif") return toast("Choose a GIF image.");
-  if (file.size > 5 * 1024 * 1024) return toast("Chat GIFs must be 5 MB or smaller.");
-  const path = `${state.room.id}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+  if (file.size < 1 || file.size > 5 * 1024 * 1024) return toast("Chat GIFs must be between 1 byte and 5 MB.");
+  if (!(await canUploadToRoom(file, roomId))) return;
+  const path = `${roomId}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
   setBusy(true);
-  const { error: uploadError } = await supabase.storage.from("spirit-files").upload(path, file, { contentType: "image/gif", upsert: false });
-  if (uploadError) { setBusy(false); return toast(uploadError.message); }
-  const { error } = await supabase.from("messages").insert({ room_id: state.room.id, user_id: state.user.id, body: "", attachment_path: path, attachment_type: "gif" });
-  setBusy(false);
-  if (error) { await supabase.storage.from("spirit-files").remove([path]); return toast(error.message); }
-  await loadMessages();
+  try {
+    const { error: uploadError } = await supabase.storage.from("spirit-files").upload(path, file, { contentType: "image/gif", upsert: false });
+    if (uploadError) return toast(uploadError.message);
+    let { error } = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body: "", attachment_path: path, attachment_type: "gif", file_size: file.size });
+    // Older databases can still share GIFs; the migration adds the column and DB-level quota check.
+    if (error && /file_size.*column|column.*file_size/i.test(error.message)) {
+      const retry = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body: "", attachment_path: path, attachment_type: "gif" });
+      error = retry.error;
+    }
+    if (error) {
+      await supabase.storage.from("spirit-files").remove([path]);
+      return toast(error.message);
+    }
+    if (state.room?.id === roomId) await loadMessages();
+    if (state.room?.id === roomId) await refreshRoomStorage();
+  } finally {
+    setBusy(false);
+  }
 });
 
 $("#memory-files").addEventListener("change", async (event) => {
   const files = [...(event.target.files || [])];
   event.target.value = "";
-  if (!state.room || !files.length) return;
+  const roomId = state.room?.id;
+  const userId = state.user?.id;
+  if (!roomId || !userId || !files.length) return;
   for (const file of files) {
     const media_type = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) ? "image" : null;
     if (!media_type) { toast(`Skipping unsupported file: ${file.name}`); continue; }
-    if (file.size > MAX_UPLOAD) { toast(`${file.name} is over the 50 MB limit.`); continue; }
-    if (!(await canUploadToRoom(file))) continue;
-    const path = `${state.room.id}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    if (file.size < 1 || file.size > MAX_UPLOAD) { toast(`${file.name} must be between 1 byte and 50 MB.`); continue; }
+    if (!(await canUploadToRoom(file, roomId))) continue;
+    const path = `${roomId}/${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     setBusy(true);
-    const { error: uploadError } = await supabase.storage.from("spirit-memories").upload(path, file, { contentType: file.type, upsert: false });
-    if (uploadError) { setBusy(false); toast(uploadError.message); continue; }
-    const { error } = await supabase.from("memories").insert({ room_id: state.room.id, user_id: state.user.id, storage_path: path, media_type, file_size: file.size, caption: "" });
-    if (error) {
-      await supabase.storage.from("spirit-memories").remove([path]);
-      toast(error.message);
+    try {
+      const { error: uploadError } = await supabase.storage.from("spirit-memories").upload(path, file, { contentType: file.type, upsert: false });
+      if (uploadError) { toast(uploadError.message); continue; }
+      const { error } = await supabase.from("memories").insert({ room_id: roomId, user_id: userId, storage_path: path, media_type, file_size: file.size, caption: "" });
+      if (error) {
+        await supabase.storage.from("spirit-memories").remove([path]);
+        toast(error.message);
+      }
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
-  await loadMemories();
-  await refreshRoomStorage();
+  if (state.room?.id === roomId) {
+    await loadMemories();
+    await refreshRoomStorage();
+  }
 });
 
 async function loadMemories() {

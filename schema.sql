@@ -52,6 +52,7 @@ create table public.messages (
   message_kind text not null default 'text' check (message_kind in ('text','sticker')),
   attachment_path text,
   attachment_type text check (attachment_type in ('gif')),
+  file_size bigint not null default 0 check (file_size between 0 and 52428800),
   reply_to_id uuid references public.messages(id) on delete set null,
   created_at timestamptz not null default now(),
   check (char_length(body) > 0 or attachment_path is not null)
@@ -135,11 +136,22 @@ create or replace function public.enforce_room_storage_quota()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare current_bytes bigint;
 begin
+  if coalesce((to_jsonb(new)->>'file_size')::bigint,0) <= 0 then return new; end if;
   perform pg_advisory_xact_lock(hashtextextended(new.room_id::text,0));
-  select coalesce((select sum(file_size) from public.subject_files where room_id=new.room_id),0)
-       + coalesce((select sum(file_size) from public.memories where room_id=new.room_id),0)
-    into current_bytes;
-  if current_bytes + new.file_size > 104857600 then
+  -- Count actual private Storage objects, including room-chat GIFs.
+  select coalesce(sum(coalesce(nullif(metadata->>'size','')::bigint,0)),0)
+    into current_bytes
+    from storage.objects
+    where bucket_id in ('spirit-files','spirit-memories')
+      and (storage.foldername(name))[1] = new.room_id::text
+      and name <> coalesce(
+        case when tg_table_name = 'messages'
+          then to_jsonb(new)->>'attachment_path'
+          else to_jsonb(new)->>'storage_path'
+        end,
+        ''
+      );
+  if current_bytes + coalesce((to_jsonb(new)->>'file_size')::bigint,0) > 104857600 then
     raise exception 'This room has reached its 100 MB storage limit';
   end if;
   return new;
@@ -149,6 +161,8 @@ $$;
 create trigger subject_files_room_quota before insert on public.subject_files
 for each row execute function public.enforce_room_storage_quota();
 create trigger memories_room_quota before insert on public.memories
+for each row execute function public.enforce_room_storage_quota();
+create trigger messages_room_quota before insert on public.messages
 for each row execute function public.enforce_room_storage_quota();
 
 create or replace function public.is_room_member(target_room uuid)

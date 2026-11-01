@@ -14,7 +14,7 @@ The layout adapts to desktop, tablet, and phone screens. The web manifest and se
 ## Setup outline
 
 1. Create a Supabase project on the Free plan.
-2. Run `schema.sql` in Supabase SQL Editor.
+2. For a new Supabase project, run `schema.sql` in the SQL Editor. If your database already exists from an older SpiritHUB version, do not rerun the full schema; run `migrations/20261101_room_chat_gif_quota.sql` once.
 3. Enable Google in Supabase Authentication and configure the OAuth client using Supabase's Google sign-in guide.
 4. Add the production site URL and local development URL to Supabase's allowed redirect URLs.
 5. Copy the project URL and public anon/publishable key into `app-config.js`.
@@ -39,7 +39,7 @@ Files are private to signed-in room members. The browser only contains the publi
 
 Message and birthday alerts appear in the in-app notification center. Browser notifications work while SpiritHUB is open and has permission. Notifications delivered while the app is fully closed need a web-push service worker plus push credentials/server setup; that is a later upgrade and should be configured only after the core app is live.
 
-SpiritHUB includes a fixed six-sticker set and accepts GIF uploads in chat (up to 5 MB). Subject files and photo/video memories allow up to 50 MB per file. Because the 1 GB storage allowance is shared by the whole Supabase project, these limits should be reduced for a large class or video-heavy use. Add an admin storage meter, per-room quota, and image/video compression before inviting a large group.
+SpiritHUB includes a fixed six-sticker set and accepts GIF uploads in chat (up to 5 MB). Subject files and photo memories allow up to 50 MB per file. Because the 1 GB storage allowance is shared by the whole Supabase project, these limits should be reduced for large classes or photo-heavy use. The room storage meter and per-room quota help admins monitor usage; image compression can further reduce storage consumption.
 
 The shared back end requires the Supabase setup above. Keep the Supabase service-role key private; the browser app uses only the public anon/publishable key and relies on the included database/storage policies.
 

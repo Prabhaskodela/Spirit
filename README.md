@@ -1,45 +1,89 @@
-# SpiritHUB
+# Spirited Workspace
 
-SpiritHUB is a semester-based class space for course files, room chat, and shared memories. It uses the PixelPulse dark, gradient-led visual style and is designed as a static web app backed by Supabase.
+A class collaboration space organized as **workspaces → semesters → subject channels**, with chat, PDF and screenshot sharing, invite links, and optional study tools.
 
-The layout adapts to desktop, tablet, and phone screens. The web manifest and service worker support installing SpiritHUB to a device home screen and caching the app shell. Sign-in, messages, uploads, and shared room data require an internet connection; the app shell alone is not an offline copy of class content.
+- **Admins** create the workspace with its academic year, add semesters (Sem 1, Sem 2…) and subject channels with course codes, reset the invite, make other admins, and remove people.
+- **Every member** can copy the invite link or code, join more workspaces with **↗**, and see the 100 MB storage meter. It turns amber at 80%, and admins get a **Free up space** link.
+- **In chat**, everyone can reply to a message, react with 👍 ❤️ 😂 🔥 🎉, add emoji, send one of six stickers, share GIFs up to 5 MB, and **@mention** classmates (type @ or tap the @ button); the people you mention get a notification. Each workspace has a **📷 Memories** photo gallery. Photos and screenshots over 1 MB are shrunk before upload.
+- **Notifications**: the 🔔 bell lists new messages from other channels and classmates' birthdays (only the day and month are stored). Browser pop-ups can be turned on while Spirited Workspace is open.
+- **Ask AI**: each channel has an Ask AI tab for chatting with the model on your own laptop about that channel's files. Saved summaries are included automatically, and you can tap up to two files to have it read them in full. The chat is private and stays in your browser; **Share in #channel** posts an answer for everyone.
+- **Spirit AI (online)**: a workspace assistant in the left navigation above Memories. Every signed-in member can use it, with a separate chat for each member and workspace. Only that member can view their Spirit AI history on that device; it is not shared with the room. It answers questions and reads a PDF or screenshot you attach, does not use Ollama, and uses Gemini’s free API tier. Quota limits can pause it, and Google may use free-tier requests to improve its products.
+- **Backup on every device**: each phone or laptop keeps a copy of the workspaces it opens (messages, files and Memories photos) in the browser, updated every few minutes while Spirited Workspace is open. The line under the storage meter shows when it last updated; tap it for details. Signing out can also delete it, for shared computers.
+- **Phones**: the chat, tabs and message box are laid out for small screens.
+- **Photos**: admins give each workspace a photo (shown in the left bar instead of its initials) and a chat background in **▾ → Workspace settings**. Everyone adds their own profile photo by clicking their name in the bottom corner; classmates see it next to their messages.
+- **Admin panel** (▾ → Admin panel, admins only): everything the workspace keeps in Supabase, including storage per channel, each channel's messages and files, each member's activity, and every file with Open and Delete. **Free up space** moves older files off Supabase: they're saved on the admin's device first, stay on every device that backed them up, and keep their names and AI summaries in the chat. Sign-in emails are never shown.
+- **Everyone** signs in with email and password from any device, chats, uploads PDFs and images (up to 50 MB each), and can summarize any file with their local AI. Saved summaries show up for the whole channel.
 
-## Free-tier shape
+## 1. Set up Supabase (once, free plan)
 
-- Front end: static HTML, CSS, and JavaScript; suitable for free GitHub Pages hosting (the repository must be public on GitHub Free).
-- Backend: Supabase Google Auth, Postgres, Realtime chat, and private Storage.
-- Current Supabase Free limits include 1 GB Storage, a maximum 50 MB per uploaded file, and a possible pause after seven days with low database activity. These are shared project quotas, not per-room allowances. For a zero-cost class project, SpiritHUB should enforce conservative upload caps and show storage guidance. A larger or continuously available service may eventually need a paid plan.
-- Google OAuth needs a Google Cloud OAuth client and the Supabase callback URL configured. Do not put the Google client secret or Supabase service-role key in this static app.
+1. Create a project at [supabase.com](https://supabase.com).
+2. **SQL Editor → New query**: paste all of `supabase/schema.sql` and click **Run**.
+3. **Authentication → Sign In / Providers → Email**: turn off **Confirm email**. Otherwise every new account waits for a confirmation email, and Supabase's built-in mailer only sends a few per hour. With it off, Supabase sends no email at all.
+4. **Project Settings → API**: copy the **Project URL** and the **anon public** key into `config.js`. That key is meant to be public; never put the `service_role` key in this app.
 
-## Setup outline
+The database tables are prefixed `hub_` to keep Spirited Workspace data grouped under one namespace.
 
-1. Create a Supabase project on the Free plan.
-2. For a new Supabase project, run `schema.sql` in the SQL Editor. If your database already exists from an older SpiritHUB version, do not rerun the full schema; run `migrations/20261101_room_chat_gif_quota.sql` once.
-3. Enable Google in Supabase Authentication and configure the OAuth client using Supabase's Google sign-in guide.
-4. Add the production site URL and local development URL to Supabase's allowed redirect URLs.
-5. Copy the project URL and public anon/publishable key into `app-config.js`.
-6. Serve this folder over HTTP (for example, `npx serve .` or VS Code Live Server) while developing. OAuth and browser module imports do not work reliably from a `file://` URL.
-7. Publish the folder through GitHub Pages and add that exact URL to the OAuth and Supabase redirect allowlists.
+**Set up before these features were added?** Run the files in `supabase/updates/` that your project hasn't had yet, in order, once each in the SQL Editor:
 
-## Initial feature scope
+- `001-admin-options.sql`: academic year, course codes, invite codes every member can copy, and the 100 MB storage limit.
+- `002-member-features.sql`: replies, reactions and stickers in chat, the Memories gallery, birthdays, and notifications.
+- `003-fix-replies.sql`: lets replies to earlier messages send.
+- `004-free-up-space-and-mentions.sql`: Free up space, a guard that stops uploads before the project's 1 GB of file storage fills up, and @mention notifications.
+- `005-photos.sql`: workspace photos, chat backgrounds and profile photos.
+- `006-custom-invite-codes.sql`: lets admins set a stable custom invite code.
+- `007-secure-helpers-and-index-foreign-keys.sql`: restricts membership helper functions to signed-in users and adds indexes for foreign keys.
+- `008-cache-auth-in-rls-policies.sql`: evaluates the signed-in user ID once per statement in row access policies.
 
-- Google sign-in and a user-selected display name.
-- Room creation with an 8-character invite ID, joining by ID, member list, removal controls, and ID rotation.
-- Semesters and subjects within each room.
-- Admin controls to rename or delete semesters and subjects; deleting also removes their files and subject chat.
-- Private subject PDF/image uploads and downloads, both in a shared library and that subject's own chat.
-- Room-wide and subject-specific real-time chats with reply context, quick emoji reactions, Unicode emoji, a built-in sticker set, and GIF uploads in the room chat.
-- In-app notifications for room messages and birthdays (only month and day are stored; birthday reminders are room-scoped).
-- Optional browser notifications while SpiritHUB is open, after each user enables them in the browser.
-- A private room memories gallery for images only; videos are not accepted.
-- Room storage meter, a 100 MB per-room quota, and ZIP export of room records and media.
-- Admin permissions for room organization; row-level security checks room membership in the database.
+New projects don't need these updates: `supabase/schema.sql` includes all eight.
 
-Files are private to signed-in room members. The browser only contains the public Supabase key; database and Storage row-level security policies enforce room access. Google OAuth is enabled at the provider level, so the login button uses Google accounts and does not ask SpiritHUB users for a separate password. If you mean consumer `@gmail.com` addresses only (excluding Google Workspace accounts), an additional server-side email-domain check will be needed. Birthdays are optional and store only month and day, not the birth year.
+## 2. Run it
 
-Message and birthday alerts appear in the in-app notification center. Browser notifications work while SpiritHUB is open and has permission. Notifications delivered while the app is fully closed need a web-push service worker plus push credentials/server setup; that is a later upgrade and should be configured only after the core app is live.
+On your own computer, from the repo folder:
 
-SpiritHUB includes a fixed six-sticker set and accepts GIF uploads in chat (up to 5 MB). Subject files and photo memories allow up to 50 MB per file. Because the 1 GB storage allowance is shared by the whole Supabase project, these limits should be reduced for large classes or photo-heavy use. The room storage meter and per-room quota help admins monitor usage; image compression can further reduce storage consumption.
+```bash
+python3 -m http.server 8790 --bind 127.0.0.1
+```
 
-The shared back end requires the Supabase setup above. Keep the Supabase service-role key private; the browser app uses only the public anon/publishable key and relies on the included database/storage policies.
+Then open http://localhost:8790/.
 
+For classmates on other devices, publish the repository root with GitHub Pages (repo **Settings → Pages**, which only the repo owner can change). The app is then at `https://<owner>.github.io/Spirit/`. The old `/Spirit/hub/` address redirects to this main app. Invite links use the address you copy them from, so copy them from the published site.
+
+## 3. Local AI on each laptop
+
+One command per laptop installs Ollama if needed, lets the Spirited Workspace website use it (kept after restarts), and downloads the `qwen3.5:4b` model (about 3.4 GB):
+
+- **Mac**, in Terminal: `curl -fsSL https://prabhaskodela.github.io/Spirit/setup/mac.sh | bash`
+- **Windows**, in Command Prompt or PowerShell: `powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object Net.WebClient).DownloadString('https://prabhaskodela.github.io/Spirit/setup/windows.ps1'))"`
+
+Then in Spirited Workspace click **⚙** next to your name → **Test connection** → **Save**. The ⚙ dialog shows these commands with a Copy button whenever it can't reach Ollama. Chrome may ask to let the site reach devices on your local network; allow it. The scripts are in `setup/`; set `SPIRITHUB_SITE` to allow a different address.
+
+The file goes from Supabase to your browser and to the model on your laptop. It isn't sent anywhere else.
+
+## 4. Spirit AI (online, free tier)
+
+Spirit AI is independent from Local AI (Ollama). Open it from the workspace navigation, above Memories. Each workspace has its own Spirit AI chat. It sends the signed-in user's question and optional PDF/image to a Supabase Edge Function, which checks workspace membership and calls Gemini. Conversations are kept in that browser; uploads are sent for inference and are not saved as Spirit AI chat attachments.
+
+To enable it without a local model:
+
+1. In Google AI Studio, create an API key using a free-tier project/model. **Do not link a billing account** if you want Google requests to stop at free limits instead of becoming billable. Free-tier eligibility and quotas can vary by account and change over time.
+2. In Supabase **Project Settings → Edge Functions → Secrets**, add `GEMINI_API_KEY` with that key. Never put the key in `config.js`, GitHub, or a chat message.
+3. From a terminal with the Supabase CLI installed, run these commands from the repository:
+   ```sh
+   supabase login
+   supabase link --project-ref YOUR_SUPABASE_PROJECT_REF
+   supabase functions deploy spirit-ai
+   ```
+4. Spirit AI is available from the workspace navigation above **Memories**, whether or not a chat room is selected. It accepts one PDF, PNG, JPEG, or WebP attachment up to 4 MB with a question. If Gemini's free quota is exhausted or unavailable, it shows a limit/setup message and does not choose a paid model.
+
+Supabase's Free plan currently includes 500,000 Edge Function calls monthly. Keep the Supabase project on the Free plan for the no-cost setup; usage caps can pause the feature. Google states that free-tier requests may be used to improve its products, so don't upload private or sensitive material.
+
+## Free-plan limits
+
+500 MB database, 1 GB of file storage shared by every workspace, and 50 MB per file. Uploads stop at 950 MB for the whole project, so it never gets stuck full; admins then free up space. Supabase pauses free projects after a week without activity; open the dashboard to wake it up.
+
+## How access works
+
+- Row-level security lets people see only the workspaces they belong to.
+- Only admins can see or reset the invite code. Resetting it makes old links stop working.
+- Files are in a private storage bucket and open through short-lived signed links.
+- The workspace owner can't be removed or demoted, and only the owner can delete the workspace.

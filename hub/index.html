@@ -3,96 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090e10">
-  <meta name="description" content="Spirited Workspace is your semester's shared space for notes, conversations, and memories.">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Spirited Workspace</title>
-  <link rel="manifest" href="./manifest.json">
-  <link rel="icon" href="/Spirit/icons/icon-192.png" type="image/png" sizes="192x192">
-  <link rel="apple-touch-icon" href="/Spirit/icons/icon-192.png">
-  <link rel="stylesheet" href="/Spirit/styles.css?v=20261101-brand-update">
-  <script type="module" src="/Spirit/app.js?v=20261101-brand-update"></script>
+  <meta http-equiv="refresh" content="0; url=../">
+  <link rel="canonical" href="../">
+  <title>SpiritHUB Workspaces</title>
+  <script>
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      navigator.serviceWorker.register("./sw.js").then((registration) => registration.update()).catch(() => {});
+    }
+    const destination = new URL("../", location.href);
+    destination.search = location.search;
+    destination.hash = location.hash;
+    location.replace(destination.href);
+  </script>
 </head>
-<body class="hub-route">
-  <div class="app-frame">
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="Spirited Workspace home">
-        <img class="brand-image" src="/Spirit/spirited-workspace-logo.svg" alt="Spirited Workspace">
-      </a>
-      <p class="topline">YOUR PEOPLE. YOUR SEMESTER.</p>
-      <button class="install-button" id="install-app" type="button" hidden>Install Spirited Workspace <span>↗</span></button>
-      <div class="account-area" id="account-area" hidden><button class="notification-button" id="notifications-open" type="button" aria-label="Notifications">♧<span class="notification-count" id="notification-count" hidden></span></button><button class="account-name" id="account-name" type="button" aria-label="Edit profile">Student</button><button class="quiet-button" id="sign-out" type="button">Sign out</button></div>
-    </header>
-    <div class="offline-banner" id="offline-banner" role="status" hidden>You’re offline. Spirited Workspace’s shared rooms, chat, and files need an internet connection.</div>
-
-    <section class="auth-wrap" id="auth-screen">
-      <div class="auth-card">
-        <div class="auth-spark">✳</div>
-        <p class="eyebrow">THE SEMESTER, TOGETHER</p>
-        <h1>Good notes.<br><span class="gradient-text">Better memories.</span></h1>
-        <p class="auth-copy">A shared home for your class: subjects, files, conversations, and the moments in between.</p>
-        <button class="google-button" id="google-sign-in" type="button"><span class="google-g">G</span> Continue with Google <span class="button-arrow">↗</span></button>
-        <p class="auth-foot">Your email stays private. Your room sees the name you choose.</p>
-        <div class="setup-note" id="setup-note" hidden></div>
-      </div>
-      <div class="auth-orbit orbit-a"></div><div class="auth-orbit orbit-b"></div>
-    </section>
-
-    <div class="workspace" id="workspace" hidden>
-      <aside class="sidebar">
-        <div class="side-heading"><div><p class="eyebrow">YOUR CIRCLES</p><h2>Rooms</h2></div><button class="add-room-button" id="create-room-open" type="button" aria-label="Create room">＋</button></div>
-        <button class="join-room-link" id="join-room-open" type="button"><span>↗</span> Join with room ID</button>
-        <div id="room-list" class="room-list"></div>
-        <div class="sidebar-tip"><span>✦</span><p>Each room gets its own semesters, subjects, and shared space.</p></div>
-      </aside>
-
-      <main class="room-main">
-        <section class="welcome-empty" id="welcome-empty">
-          <div class="welcome-glyph">✳</div><p class="eyebrow">A SPACE FOR YOUR CLASS</p><h1>Make this semester<br><span class="gradient-text">a little more together.</span></h1>
-          <p>Create a room for your class or join one with an ID from your admin.</p>
-          <div class="welcome-actions"><button class="primary-button" id="welcome-create" type="button">Create a room <span>↗</span></button><button class="secondary-button" id="welcome-join" type="button">Join with room ID</button></div>
-        </section>
-
-        <section class="room-content" id="room-content" hidden>
-          <div class="room-heading">
-          <div class="room-heading-copy"><p class="eyebrow" id="room-kicker">YOUR CLASS SPACE</p><div class="room-title-row"><h1 id="room-name">Room name</h1><button class="room-id-chip" id="copy-room-id" type="button">Copy room ID</button></div><p class="member-line" id="member-line">0 members · your shared class space</p></div>
-          <div class="semester-control"><label for="semester-select">SEMESTER</label><select id="semester-select"></select><button id="add-semester" class="semester-add" type="button" aria-label="Add semester">＋</button><button id="manage-semester" class="semester-manage" type="button" hidden>Manage</button></div>
-          </div>
-          <nav class="room-tabs" aria-label="Room sections"><button class="room-tab is-active" type="button" data-section="subjects-section">Subjects</button><button class="room-tab" type="button" data-section="chat-section">Chat</button><button class="room-tab" type="button" data-section="memories-section">Memories</button></nav>
-
-          <section id="subjects-section" class="room-section">
-            <div class="section-top"><div><p class="eyebrow">SEMESTER MATERIALS</p><h2 id="subjects-heading">Pick a subject</h2></div><button class="primary-button" id="add-subject" type="button">＋ Add subject</button></div>
-            <div class="subject-layout"><div id="subject-list" class="subject-list"></div><div id="subject-detail" class="subject-detail"><div class="sub-empty"><span>✦</span><h3>Choose a subject</h3><p>Notes, slides, and helpful links will live here.</p></div></div></div>
-          </section>
-
-          <section id="chat-section" class="room-section chat-section" hidden>
-            <div class="section-top"><div><p class="eyebrow">THE CLASS CONVERSATION</p><h2>Group chat</h2></div><span class="chat-presence"><span class="live-dot"></span> Room chat</span></div>
-            <div class="chat-box"><div id="message-list" class="message-list"><div class="chat-placeholder"><span>✳</span><p>Say hi to your room. Questions, ideas, and tiny wins all belong here.</p></div></div>
-              <form id="chat-form" class="chat-form"><div id="reply-context" class="reply-context" hidden><span id="reply-context-label"></span><button type="button" id="cancel-reply" aria-label="Cancel reply">×</button></div><div class="chat-tools"><button class="chat-tool" id="emoji-button" type="button" aria-label="Emoji">☺</button><button class="chat-tool" id="sticker-button" type="button" aria-label="Sticker">✦</button><label class="chat-tool" for="gif-file" aria-label="Share GIF">GIF</label><input id="gif-file" type="file" accept="image/gif" hidden><input id="chat-input" type="text" maxlength="1200" placeholder="Share something with your room…" aria-label="Type a message"><button class="send-button" type="submit" aria-label="Send message">↗</button></div><div id="emoji-picker" class="emoji-picker" hidden></div><div id="sticker-picker" class="sticker-picker" hidden></div></form>
-            </div>
-          </section>
-
-        <section id="memories-section" class="room-section" hidden>
-            <div class="section-top"><div><p class="eyebrow">THE MOMENTS BETWEEN CLASSES</p><h2>Room memories</h2><p class="section-note">Little snapshots from the semester, shared with your room.</p></div><label class="primary-button memory-upload" for="memory-files">＋ Upload photos</label><input id="memory-files" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden></div>
-            <div id="memory-grid" class="memory-grid"></div><div id="memory-empty" class="memory-empty"><span>✳</span><h3>Make the first memory</h3><p>Upload a photo your room will remember.</p></div>
-          </section>
-        </section>
-      </main>
-    </div>
-    <footer class="app-footer"><span>SPIRITED WORKSPACE</span><span>Made for shared semesters.</span></footer>
-  </div>
-
-  <dialog class="modal" id="profile-dialog"><form id="profile-form" method="dialog"><button class="modal-close" type="button" data-close="profile-dialog" aria-label="Close">×</button><p class="eyebrow">WELCOME</p><h2>Set your profile</h2><p class="modal-copy">Choose how your classmates will see you in room chats and updates.</p><label class="form-label" for="display-name">Display name</label><input id="display-name" class="text-input" type="text" maxlength="32" required><label class="form-label" for="birthday">Birthday</label><input id="birthday" class="text-input" type="date"><button class="primary-button" type="submit">Save profile</button></form></dialog>
-  <dialog class="modal" id="create-room-dialog"><form id="create-room-form" method="dialog"><button class="modal-close" type="button" data-close="create-room-dialog" aria-label="Close">×</button><p class="eyebrow">NEW ROOM</p><h2>Create a room</h2><label class="form-label" for="new-room-name">Room name</label><input id="new-room-name" class="text-input" type="text" maxlength="60" required><label class="form-label" for="new-room-year">Academic year</label><input id="new-room-year" class="text-input" type="text" placeholder="2026-2027"><button class="primary-button" type="submit">Create room</button></form></dialog>
-  <dialog class="modal" id="join-room-dialog"><form id="join-room-form" method="dialog"><button class="modal-close" type="button" data-close="join-room-dialog" aria-label="Close">×</button><p class="eyebrow">JOIN ROOM</p><h2>Enter room ID</h2><label class="form-label" for="join-room-id">Room ID</label><input id="join-room-id" class="text-input" type="text" maxlength="12" required><button class="primary-button" type="submit">Join room</button></form></dialog>
-  <dialog class="modal" id="semester-dialog"><form id="semester-form" method="dialog"><button class="modal-close" type="button" data-close="semester-dialog" aria-label="Close">×</button><p class="eyebrow">SEMESTER SETUP</p><h2>Add a semester</h2><label class="form-label" for="new-semester-name">Semester name</label><input id="new-semester-name" class="text-input" type="text" maxlength="80" required><button class="primary-button" type="submit">Save semester</button></form></dialog>
-  <dialog class="modal" id="manage-semester-dialog"><div><button class="modal-close" type="button" data-close="manage-semester-dialog" aria-label="Close">×</button><p class="eyebrow">ROOM ADMIN</p><h2>Manage semester</h2><label class="form-label" for="rename-semester">Semester name</label><input id="rename-semester" class="text-input" type="text" maxlength="80"><button id="save-semester-name" class="primary-button" type="button">Rename</button><button id="delete-semester" class="danger-button" type="button">Delete semester</button></div></dialog>
-  <dialog class="modal" id="subject-dialog"><form id="subject-form" method="dialog"><button class="modal-close" type="button" data-close="subject-dialog" aria-label="Close">×</button><p class="eyebrow">NEW SUBJECT</p><h2>Add a subject</h2><label class="form-label" for="new-subject-name">Subject name</label><input id="new-subject-name" class="text-input" type="text" maxlength="80" required><label class="form-label" for="new-subject-code">Course code</label><input id="new-subject-code" class="text-input" type="text" maxlength="40" placeholder="Optional"><button class="primary-button" type="submit">Save subject</button></form></dialog>
-  <dialog class="modal" id="name-room-dialog"><form id="name-room-form" method="dialog"><button class="modal-close" type="button" data-close="name-room-dialog" aria-label="Close">×</button><p class="eyebrow">PROFILE</p><h2>Edit name</h2><label class="form-label" for="new-display-name">Display name</label><input id="new-display-name" class="text-input" type="text" maxlength="32" required><label class="form-label" for="new-birthday">Birthday</label><input id="new-birthday" class="text-input" type="date"><button class="primary-button" type="submit">Save</button></form></dialog>
-  <dialog class="modal members-dialog" id="members-dialog"><div><button class="modal-close" type="button" data-close="members-dialog" aria-label="Close">×</button><p class="eyebrow">PEOPLE IN THIS ROOM</p><h2>Members</h2><div id="member-list" class="member-list"></div><button id="rotate-room-code" class="secondary-button" type="button">Rotate room ID</button></div></dialog>
-  <dialog class="modal notifications-dialog" id="notifications-dialog"><div><button class="modal-close" type="button" data-close="notifications-dialog" aria-label="Close">×</button><p class="eyebrow">UPDATES</p><h2>Notifications</h2><div id="notification-list" class="notification-list"></div><button id="enable-notifications" class="primary-button" type="button">Enable browser alerts</button></div></dialog>
-  <dialog class="modal" id="manage-subject-dialog"><div><button class="modal-close" type="button" data-close="manage-subject-dialog" aria-label="Close">×</button><p class="eyebrow">ROOM ADMIN</p><h2>Manage subject</h2><label class="form-label" for="rename-subject">Subject name</label><input id="rename-subject" class="text-input" type="text" maxlength="80"><label class="form-label" for="rename-subject-code">Course code</label><input id="rename-subject-code" class="text-input" type="text" maxlength="40" placeholder="Optional"><button id="save-subject" class="primary-button" type="button">Rename</button><button id="delete-subject" class="danger-button" type="button">Delete subject</button></div></dialog>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<body>
+  <p>SpiritHUB has moved to <a href="../">the repository’s main page</a>.</p>
 </body>
 </html>

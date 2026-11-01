@@ -1,27 +1,43 @@
 {
-  "name": "SpiritHUB",
-  "short_name": "SpiritHUB",
-  "description": "SpiritHUB shared class rooms for subjects, files, chats, and memories.",
-  "start_url": "/Spirit/hub/",
+  "id": "/Spirit/",
+  "name": "Spirited Workspace",
+  "short_name": "Spirited",
+  "description": "Your semester's shared space for notes, conversations, and memories.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/Spirit/",
   "scope": "/Spirit/",
   "display": "standalone",
+  "display_override": [
+    "standalone"
+  ],
+  "orientation": "any",
+  "categories": [
+    "education",
+    "social"
+  ],
+  "launch_handler": {
+    "client_mode": [
+      "navigate-existing"
+    ]
+  },
   "background_color": "#101116",
   "theme_color": "#101116",
   "icons": [
     {
-      "src": "/Spirit/icons/icon-192.png",
+      "src": "/Spirit/assets/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/Spirit/icons/icon-512.png",
+      "src": "/Spirit/assets/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/Spirit/icons/icon-512-maskable.png",
+      "src": "/Spirit/assets/icons/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="540" viewBox="0 0 1200 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 240) rotate(90) scale(360 620)">
+      <stop stop-color="#0B1638"/>
+      <stop offset="0.35" stop-color="#050B1A"/>
+      <stop offset="1" stop-color="#02050C"/>
+    </radialGradient>
+    <radialGradient id="nebulaA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(350 190) rotate(90) scale(220 360)">
+      <stop stop-color="#C7E3FF" stop-opacity="0.9"/>
+      <stop offset="0.28" stop-color="#A9C8FF" stop-opacity="0.62"/>
+      <stop offset="0.7" stop-color="#4A5FE0" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#0D1328" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="nebulaB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(890 120) rotate(90) scale(280 420)">
+      <stop stop-color="#DDE6FF" stop-opacity="0.85"/>
+      <stop offset="0.35" stop-color="#B3C9FF" stop-opacity="0.56"/>
+      <stop offset="0.7" stop-color="#4A5FE0" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#0D1328" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wordMain" x1="200" y1="185" x2="990" y2="185" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FAFF"/>
+      <stop offset="1" stop-color="#E3E8F8"/>
+    </linearGradient>
+    <linearGradient id="wordSub" x1="400" y1="330" x2="760" y2="330" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1F5FF"/>
+      <stop offset="1" stop-color="#C8D1FF"/>
+    </linearGradient>
+    <filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="540" rx="72" fill="url(#bgGlow)"/>
+  <ellipse cx="350" cy="200" rx="390" ry="180" fill="url(#nebulaA)" filter="url(#softBlur)"/>
+  <ellipse cx="910" cy="160" rx="420" ry="220" fill="url(#nebulaB)" filter="url(#softBlur)"/>
+
+  <g opacity="0.9">
+    <circle cx="200" cy="90" r="3" fill="#F2F6FF"/>
+    <circle cx="1050" cy="70" r="2.8" fill="#EAF3FF"/>
+    <circle cx="1100" cy="260" r="2.6" fill="#EAF5FF"/>
+    <circle cx="870" cy="420" r="2.8" fill="#EEF4FF"/>
+    <circle cx="160" cy="420" r="2.6" fill="#DDE9FF"/>
+    <circle cx="970" cy="390" r="2.6" fill="#EEF4FF"/>
+    <circle cx="50" cy="250" r="2.2" fill="#DDE7FF"/>
+    <circle cx="1160" cy="170" r="2.2" fill="#EAF3FF"/>
+    <circle cx="430" cy="50" r="2.5" fill="#F1F7FF"/>
+    <circle cx="620" cy="95" r="3" fill="#D8E4FF"/>
+    <circle cx="740" cy="90" r="2.5" fill="#ECF4FF"/>
+    <circle cx="300" cy="468" r="2.5" fill="#E6F0FF"/>
+    <circle cx="500" cy="470" r="2.6" fill="#FCFDFF"/>
+    <circle cx="1030" cy="470" r="2.4" fill="#EAF4FF"/>
+  </g>
+
+  <g opacity="0.75" fill="#F8FBFF">
+    <path d="M600 204L606 220L622 226L606 232L600 248L594 232L578 226L594 220L600 204Z"/>
+    <path d="M880 220L884 230L894 234L884 238L880 248L876 238L866 234L876 230L880 220Z"/>
+    <path d="M320 150L324 162L336 166L324 170L320 182L316 170L304 166L316 162L320 150Z"/>
+  </g>
+
+  <g>
+    <text x="600" y="270" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="170" font-weight="800" letter-spacing="-8" fill="url(#wordMain)">Spirited</text>
+    <text x="600" y="385" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="86" font-weight="300" letter-spacing="-3" fill="url(

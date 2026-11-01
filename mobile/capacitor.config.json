@@ -1,9 +1,7 @@
 {
   "appId": "com.prabhaskodela.spirithub",
-  "appName": "SpiritHUB",
+  "appName": "Spirited Workspace",
   "webDir": "www",
   "android": {
     "allowMixedContent": false,
     "appendUserAgent": " SpiritHUBAndroid"
-  }
-}

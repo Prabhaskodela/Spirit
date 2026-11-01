@@ -1,4 +1,4 @@
-const CACHE_NAME = "spirithub-shell-v6";
+const CACHE_NAME = "spirithub-shell-v7";
 const APP_FILES = ["./", "./index.html", "./styles.css", "./app.js", "./app-config.js", "./manifest.json", "./logo.svg", "./spirit-wordmark.png", "./icon.svg", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-512-maskable.png"];
 
 self.addEventListener("install", (event) => {

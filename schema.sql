@@ -136,6 +136,7 @@ create or replace function public.enforce_room_storage_quota()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare current_bytes bigint;
 begin
+  if coalesce((to_jsonb(new)->>'file_size')::bigint,0) <= 0 then return new; end if;
   perform pg_advisory_xact_lock(hashtextextended(new.room_id::text,0));
   -- Count actual private Storage objects, including room-chat GIFs.
   select coalesce(sum(coalesce(nullif(metadata->>'size','')::bigint,0)),0)

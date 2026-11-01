@@ -16,7 +16,8 @@ const FULL_MESSAGE = "This workspace is at its 100 MB storage limit. An admin ca
 // Photos and screenshots over 1 MB are shrunk before upload so the free storage lasts; GIFs and PDFs stay as they are.
 const SHRINK_OVER = 1024 * 1024;
 const MAX_PHOTO_EDGE = 2048;
-const BACKUP_EVERY = 5 * 60 * 1000; // how often each device refreshes its backup while SpiritHUB is open
+const BACKUP_EVERY = 5 * 60 * 1000; // desktop backup refresh interval
+const isMobileClient = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(max-width: 760px)").matches;
 // The original app's emoji, quick reactions and sticker set.
 const EMOJIS = "😀 😃 😄 😁 😆 😅 😂 🙂 🙃 😉 😊 😍 🥰 😎 🤓 🥳 🤔 🫡 😭 😴 🤯 🫠 🤗 🤝 👍 👎 👏 🙌 🫶 💪 🔥 ✨ 💯 ❤️ 💜 💛 🧠 📚 📝 🎓 ☕ 🌱 🚀 🎉 🥹".split(" ");
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🔥", "🎉"];
@@ -494,7 +495,7 @@ async function openWorkspace(id) {
   refreshStorage();
   subscribeWorkspace(id);
   showBackupStatus(id);
-  setTimeout(() => backupNow(id), 2000); // after the channel has loaded
+  if (!isMobileClient()) setTimeout(() => backupNow(id), 2000); // phones back up only when the user asks
   const channel = state.channels.find((candidate) => candidate.id === last.channels?.[id]) || orderedChannels()[0];
   if (channel) await openChannel(channel.id);
   else showEmpty("channel");
@@ -1548,7 +1549,12 @@ async function uploadFiles(files) {
   }
 }
 
-async function signedUrl(path) {
+async function signedUrl(path, downloadName = null) {
+  if (downloadName) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600, { download: downloadName });
+    if (error) throw error;
+    return data.signedUrl;
+  }
   const cached = state.signedUrls.get(path);
   if (cached && cached.expires > Date.now()) return cached.url;
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
@@ -1596,6 +1602,9 @@ async function openFile(file) {
   const content = $("file-viewer-content");
   const title = file.name || file.caption || "Shared photo";
   $("file-viewer-title").textContent = title;
+  $("file-viewer-actions").replaceChildren();
+  $("file-viewer-actions").hidden = true;
+  content.classList.remove("is-pdf");
   content.replaceChildren(el("p", { class: "file-viewer-loading", text: "Opening file…", role: "status" }));
   if (!viewer.open) viewer.showModal();
   try {
@@ -1606,7 +1615,15 @@ async function openFile(file) {
     if (file.mime.startsWith("image/")) {
       preview = el("img", { class: "file-viewer-image", src: url, alt: title });
     } else if (file.mime === "application/pdf") {
+      const actions = $("file-viewer-actions");
+      actions.replaceChildren();
+      actions.hidden = false;
+      const android = /Android/i.test(navigator.userAgent);
+      const openLink = el("a", { class: "file-viewer-action", href: url, target: "_blank", rel: "noopener", text: android ? "Open PDF" : "Open in new tab" });
+      actions.append(openLink);
+      actions.append(el("a", { class: "file-viewer-action", href: await signedUrl(file.path, title), text: "Download PDF", download: title }));
       preview = el("iframe", { class: "file-viewer-pdf", src: url, title });
+      content.classList.add("is-pdf");
     } else {
       preview = el("p", { class: "file-viewer-loading", text: "Preview is not available for this file type." });
     }
@@ -1664,6 +1681,7 @@ const countOf = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 function renderStorage() {
   const percent = Math.min(100, (state.storageUsed / STORAGE_LIMIT) * 100);
   $("storage").hidden = !state.workspace;
+  if (state.workspace && isMobileClient() && $("backup-status").hidden) setBackupStatus(state.workspace.id, "Tap to back up on this device");
   $("storage").classList.toggle("is-near", percent >= 80 && percent < 95);
   $("storage").classList.toggle("is-full", percent >= 95);
   const warning = percent >= 100 ? " · full" : percent >= 80 ? " · almost full" : "";
@@ -1809,7 +1827,7 @@ function setBackupStatus(workspaceId, text, problem = false) {
 
 async function showBackupStatus(workspaceId, record) {
   record ||= await backup.syncRecord(workspaceId).catch(() => null);
-  if (!record?.synced_at) return setBackupStatus(workspaceId, "Backing up on this device…");
+  if (!record?.synced_at) return setBackupStatus(workspaceId, isMobileClient() ? "Tap to back up on this device" : "Backing up on this device…");
   const when = new Date(record.synced_at).toDateString() === new Date().toDateString()
     ? shortTime(record.synced_at)
     : new Date(record.synced_at).toLocaleDateString([], { day: "numeric", month: "short" });
@@ -1824,7 +1842,7 @@ async function openBackup() {
   const record = await backup.syncRecord(workspace.id).catch(() => null);
   const persisted = await navigator.storage?.persisted?.().catch(() => false);
   const body = el("div", { class: "backup-info" },
-    el("p", { text: `SpiritHUB keeps a copy of ${workspace.name} in this browser and updates it every few minutes while it's open: messages, files and Memories photos. Files an admin moves off the online storage still open from here.` }),
+    el("p", { text: `SpiritHUB keeps a copy of ${workspace.name} in this browser. On this phone, tap the backup button when you want to save messages, files and Memories photos. Files an admin moves off the online storage still open from here.` }),
     el("p", { class: "muted", text: record?.synced_at
       ? `${countOf(record.messages, "message")}, ${countOf(record.files, "file")} and ${countOf(record.photos, "photo")} (${record.bytes ? formatSize(record.bytes) : "0 MB"}) · updated ${timeLabel(record.synced_at)}`
       : "The first backup is still running." }),
@@ -3329,10 +3347,13 @@ $("file-viewer").addEventListener("click", (event) => {
 $("file-viewer").addEventListener("close", () => {
   fileViewRequest += 1;
   $("file-viewer-content").replaceChildren();
+  $("file-viewer-content").classList.remove("is-pdf");
+  $("file-viewer-actions").replaceChildren();
+  $("file-viewer-actions").hidden = true;
 });
 $("notifications-btn").addEventListener("click", openNotifications);
 $("backup-status").addEventListener("click", openBackup);
-setInterval(() => document.visibilityState === "visible" && backupNow(), BACKUP_EVERY);
+if (!isMobileClient()) setInterval(() => document.visibilityState === "visible" && backupNow(), BACKUP_EVERY);
 $("free-space").addEventListener("click", async () => {
   await openAdmin();
   $("free-up")?.scrollIntoView({ behavior: "smooth", block: "start" });

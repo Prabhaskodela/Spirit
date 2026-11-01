@@ -964,3 +964,15 @@ body{background-image:radial-gradient(ellipse 72% 32% at 51% -9%,#60483868 0%,tr
   .message.own .msg-menu>.msg-actions{right:0}
 }
 
+
+/* Mobile PDF controls and low-cost native handoff */
+.file-viewer-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.file-viewer-action{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 12px;border:1px solid #c078286b;border-radius:9px;color:#f0e8e8;background:#2a211e;text-decoration:none;font-size:12px;font-weight:650;white-space:nowrap}
+.file-viewer-content.is-pdf{display:block;padding:0}
+.file-viewer-content.is-pdf .file-viewer-pdf{border-radius:0}
+@media(max-width:600px){
+  .file-viewer::backdrop{backdrop-filter:none}
+  .file-viewer-head{gap:7px}
+  .file-viewer-actions{gap:5px}
+  .file-viewer-action{min-height:40px;padding-inline:9px;font-size:11px}
+}

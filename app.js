@@ -711,7 +711,8 @@ async function loadSemesters(selectName) {
   state.semesters = data || [];
   if (!state.semesters.length) {
     if (state.role === "admin") {
-      const { error: insertError } = await supabase.from("semesters").insert({ room_id: state.room.id, name: "Semester 1", position: 0 });
+      const { error: insertError } = await supabase.from("semesters").insert({ room_id: roomId, name: "Semester 1", position: 0 });
+      if (state.room?.id !== roomId || loadVersion !== semestersLoadVersion) return;
       if (insertError) return toast(insertError.message);
       return loadSemesters("Semester 1");
     }
@@ -741,6 +742,7 @@ function renderSemesterSelect() {
 $("#semester-select").addEventListener("change", async (event) => {
   state.semester = state.semesters.find((item) => item.id === event.target.value) || null;
   state.subject = null;
+  state.subjectReplyTo = null;
   await loadSubjects();
 });
 
@@ -778,7 +780,9 @@ async function loadSubjects() {
   if (state.room?.id !== roomId || state.semester?.id !== semesterId || loadVersion !== subjectsLoadVersion) return;
   if (error) return toast(error.message);
   state.subjects = data || [];
-  state.subject = state.subjects.find((item) => item.id === state.subject?.id) || state.subjects[0] || null;
+  const previousSubjectId = state.subject?.id;
+  state.subject = state.subjects.find((item) => item.id === previousSubjectId) || state.subjects[0] || null;
+  if (state.subject?.id !== previousSubjectId) state.subjectReplyTo = null;
   renderSubjects();
   if (state.subject) await loadSubjectFiles();
 }
@@ -804,6 +808,7 @@ function renderSubjects() {
     button.append(icon, copy);
     button.addEventListener("click", async () => {
       state.subject = subject;
+      state.subjectReplyTo = null;
       renderSubjects();
       await loadSubjectFiles();
     });

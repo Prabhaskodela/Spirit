@@ -28,6 +28,8 @@ let subjectsLoadVersion = 0;
 let subjectFilesLoadVersion = 0;
 let roomsLoadVersion = 0;
 let memberListLoadVersion = 0;
+let activeRoomMessageIds = new Set();
+let activeSubjectMessageIds = new Set();
 let authHandledUserId;
 
 function scheduleRefresh(callback, kind) {
@@ -122,6 +124,8 @@ async function clearRealtimeChannels() {
   await Promise.allSettled(channels.map((channel) => supabase.removeChannel(channel)));
   roomChatLoadVersion++;
   subjectChatLoadVersion++;
+  activeRoomMessageIds.clear();
+  activeSubjectMessageIds.clear();
   memoriesLoadVersion++;
   roomSelectionVersion++;
   semestersLoadVersion++;
@@ -396,6 +400,8 @@ async function selectRoom(room) {
   subjectChatRefreshTimer = null;
   roomChatLoadVersion++;
   subjectChatLoadVersion++;
+  activeRoomMessageIds.clear();
+  activeSubjectMessageIds.clear();
   memoriesLoadVersion++;
   semestersLoadVersion++;
   subjectsLoadVersion++;
@@ -972,9 +978,11 @@ async function loadSubjectChat() {
   const loadVersion = ++subjectChatLoadVersion;
   const list = $("#subject-message-list");
   if (!list) return;
-  const { data: messages, error } = await supabase.from("subject_messages").select("id,subject_id,room_id,user_id,body,attachment_path,attachment_name,attachment_type,attachment_size,reply_to_id,created_at").eq("subject_id", state.subject.id).order("created_at", { ascending: true }).limit(100);
+  const { data: messages, error } = await supabase.from("subject_messages").select("id,subject_id,room_id,user_id,body,attachment_path,attachment_name,attachment_type,attachment_size,reply_to_id,created_at").eq("subject_id", subjectId).order("created_at", { ascending: false }).limit(100);
   if (error) return toast(error.message);
   if (state.subject?.id !== subjectId || loadVersion !== subjectChatLoadVersion || !list.isConnected) return;
+  messages?.reverse();
+  activeSubjectMessageIds = new Set((messages || []).map((message) => message.id));
   list.replaceChildren();
   if (!messages?.length) {
     const empty = document.createElement("p");
@@ -1087,7 +1095,14 @@ async function loadSubjectChat() {
   if (state.subject?.id !== subjectId || loadVersion !== subjectChatLoadVersion || !list.isConnected) return;
   list.scrollTop = list.scrollHeight;
   if (!state.subjectChatChannel) {
-    state.subjectChatChannel = supabase.channel(`subject-chat-${subjectId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "subject_messages", filter: `subject_id=eq.${subjectId}` }, () => scheduleRefresh(loadSubjectChat, "subject")).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => scheduleRefresh(loadSubjectChat, "subject")).subscribe();
+    state.subjectChatChannel = supabase.channel(`subject-chat-${subjectId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "subject_messages", filter: `subject_id=eq.${subjectId}` }, (payload) => {
+        if (payload.new?.user_id !== state.user?.id) scheduleRefresh(loadSubjectChat, "subject");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, (payload) => {
+        const reaction = payload.new?.subject_message_id ? payload.new : payload.old;
+        if (reaction?.user_id !== state.user?.id && activeSubjectMessageIds.has(reaction?.subject_message_id)) scheduleRefresh(loadSubjectChat, "subject");
+      }).subscribe();
   }
 }
 
@@ -1414,9 +1429,11 @@ async function loadMessages() {
   const roomId = state.room.id;
   const loadVersion = ++roomChatLoadVersion;
   const list = $("#message-list");
-  const { data: messages, error } = await supabase.from("messages").select("id,room_id,user_id,body,message_kind,attachment_path,attachment_type,reply_to_id,created_at").eq("room_id", state.room.id).order("created_at", { ascending: true }).limit(100);
+  const { data: messages, error } = await supabase.from("messages").select("id,room_id,user_id,body,message_kind,attachment_path,attachment_type,reply_to_id,created_at").eq("room_id", roomId).order("created_at", { ascending: false }).limit(100);
   if (error) return toast(error.message);
   if (state.room?.id !== roomId || loadVersion !== roomChatLoadVersion || $("#chat-section").hidden) return;
+  messages?.reverse();
+  activeRoomMessageIds = new Set((messages || []).map((message) => message.id));
   list.replaceChildren();
   if (!messages?.length) {
     const placeholder = document.createElement("div");
@@ -1456,7 +1473,14 @@ async function loadMessages() {
   if (state.room?.id !== roomId || loadVersion !== roomChatLoadVersion || $("#chat-section").hidden) return;
   list.scrollTop = list.scrollHeight;
   if (!state.chatChannel) {
-    state.chatChannel = supabase.channel(`room-chat-${roomId}`).on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` }, () => scheduleRefresh(loadMessages, "room")).on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, () => scheduleRefresh(loadMessages, "room")).subscribe();
+    state.chatChannel = supabase.channel(`room-chat-${roomId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` }, (payload) => {
+        if (payload.new?.user_id !== state.user?.id) scheduleRefresh(loadMessages, "room");
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "chat_reactions" }, (payload) => {
+        const reaction = payload.new?.message_id ? payload.new : payload.old;
+        if (reaction?.user_id !== state.user?.id && activeRoomMessageIds.has(reaction?.message_id)) scheduleRefresh(loadMessages, "room");
+      }).subscribe();
   }
 }
 

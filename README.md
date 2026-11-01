@@ -39,7 +39,7 @@ Files are private to signed-in room members. The browser only contains the publi
 
 Message and birthday alerts appear in the in-app notification center. Browser notifications work while SpiritHUB is open and has permission. Notifications delivered while the app is fully closed need a web-push service worker plus push credentials/server setup; that is a later upgrade and should be configured only after the core app is live.
 
-SpiritHUB includes a fixed six-sticker set and accepts GIF uploads in chat (up to 5 MB). Subject files and photo/video memories allow up to 50 MB per file. Because the 1 GB storage allowance is shared by the whole Supabase project, these limits should be reduced for a large class or video-heavy use. Add an admin storage meter, per-room quota, and image/video compression before inviting a large group.
+SpiritHUB includes a fixed six-sticker set and accepts GIF uploads in chat (up to 5 MB). Subject files and photo memories allow up to 50 MB per file. Because the 1 GB storage allowance is shared by the whole Supabase project, these limits should be reduced for a large class or video-heavy use. Add an admin storage meter, per-room quota, and image/video compression before inviting a large group.
 
 The shared back end requires the Supabase setup above. Keep the Supabase service-role key private; the browser app uses only the public anon/publishable key and relies on the included database/storage policies.
 

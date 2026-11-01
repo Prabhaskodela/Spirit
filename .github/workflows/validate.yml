@@ -22,6 +22,8 @@ jobs:
           for file in app.js ai.js backup.js spirit-ai.js config.js; do
             node --input-type=module --check < "$file"
           done
+      - name: Check Spirit AI edge function syntax
+        run: node --check < supabase/functions/spirit-ai/index.ts
       - name: Check service worker syntax
         run: |
           node --check sw.js

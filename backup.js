@@ -68,4 +68,12 @@ export async function forgetWorkspace(workspaceId) {
 export async function forget() {
   const database = await opened?.catch(() => null);
   database?.close();
-  
+  opened = null;
+  if (!globalThis.indexedDB) return;
+  await new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = resolve;
+    request.onerror = () => reject(request.error || new Error("This device's backup could not be deleted"));
+    request.onblocked = () => reject(new Error("Close other Spirited Workspace tabs before deleting this device's backup"));
+  });
+}

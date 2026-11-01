@@ -102,4 +102,8 @@ export async function askSpiritAi(client, { workspaceId, prompt, history = [], f
   return postWithProgress(
     SUPABASE_URL + "/functions/v1/spirit-ai",
     data.session.access_token,
-    { worksp
+    { workspaceId, prompt, history, attachment },
+    signal,
+    reportProgress,
+  );
+}

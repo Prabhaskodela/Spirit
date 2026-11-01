@@ -137,4 +137,6 @@ Deno.serve(async (req) => {
 
   const result = await aiResponse.json().catch(() => null);
   const text = result?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
-  if (!text) return response(req, { error: "Spirit
+  if (!text) return response(req, { error: "Spirit AI returned an empty answer. Try again." }, 502);
+  return response(req, { text });
+});

@@ -7,9 +7,12 @@ const mobileDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repoDir = resolve(mobileDir, "..");
 const webDir = resolve(mobileDir, "www");
 
-for (const name of ["index.html", "app.js", "app-config.js", "styles.css"]) {
+// Package the dedicated /hub/ page as the Android app's launch screen.
+// Its shared app.js, styles.css, config, and image assets remain at the web root.
+for (const name of ["app.js", "app-config.js", "styles.css"]) {
   await cp(resolve(repoDir, name), resolve(webDir, name));
 }
+await cp(resolve(repoDir, "hub/index.html"), resolve(webDir, "index.html"));
 await cp(resolve(repoDir, "icons"), resolve(webDir, "icons"), { recursive: true });
 await cp(resolve(repoDir, "spirit-wordmark.png"), resolve(webDir, "spirit-wordmark.png"));
 
@@ -31,7 +34,7 @@ const htmlPath = resolve(webDir, "index.html");
 let html = await readFile(htmlPath, "utf8");
 html = html
   .replaceAll("/Spirit/", "./")
-  .replace(/^[ \t]*<link rel="manifest" href="\.\/manifest\.json">[ \t]*\r?\n/m, "");
+  .replace(/^[ \\t]*<link rel="manifest" href="\\.\\/manifest\\.json">[ \\t]*\\r?\\n/m, "");
 await writeFile(htmlPath, html, "utf8");
 
 await build({
@@ -43,4 +46,4 @@ await build({
   target: "es2020",
 });
 
-console.log("Prepared the current SpiritHUB web app and native Capacitor plugins.");
+console.log("Prepared the SpiritHUB /hub/ experience and native Capacitor plugins.");

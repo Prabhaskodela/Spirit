@@ -435,12 +435,24 @@ function showRoom(room) {
 
 async function getRoomStorageUsage(roomId = state.room?.id) {
   if (!roomId) return 0;
-  const [{ data: files, error: fileError }, { data: memories, error: memoryError }] = await Promise.all([
+  const [{ data: files, error: fileError }, { data: memories, error: memoryError }, { data: gifs, error: gifError }] = await Promise.all([
     supabase.from("subject_files").select("file_size").eq("room_id", roomId),
     supabase.from("memories").select("file_size").eq("room_id", roomId),
+    supabase.from("messages").select("attachment_path").eq("room_id", roomId).eq("attachment_type", "gif").not("attachment_path", "is", null),
   ]);
-  if (fileError || memoryError) throw fileError || memoryError;
-  return [...(files || []), ...(memories || [])].reduce((sum, row) => sum + Number(row.file_size || 0), 0);
+  if (fileError || memoryError || gifError) throw fileError || memoryError || gifError;
+  let gifBytes = 0;
+  if (gifs?.length) {
+    const { data: objects, error: storageError } = await supabase.storage.from("spirit-files").list(roomId, { limit: 1000 });
+    if (storageError) throw storageError;
+    const gifPaths = new Set(gifs.map((message) => message.attachment_path));
+    for (const object of objects || []) {
+      if (gifPaths.has(`${roomId}/${object.name}`)) {
+        gifBytes += Number(object.metadata?.size || object.metadata?.contentLength || 0);
+      }
+    }
+  }
+  return [...(files || []), ...(memories || [])].reduce((sum, row) => sum + Number(row.file_size || 0), gifBytes);
 }
 
 async function refreshRoomStorage() {
@@ -1639,7 +1651,12 @@ $("#gif-file").addEventListener("change", async (event) => {
   try {
     const { error: uploadError } = await supabase.storage.from("spirit-files").upload(path, file, { contentType: "image/gif", upsert: false });
     if (uploadError) return toast(uploadError.message);
-    const { error } = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body: "", attachment_path: path, attachment_type: "gif", file_size: file.size });
+    let { error } = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body: "", attachment_path: path, attachment_type: "gif", file_size: file.size });
+    // Older databases can still share GIFs; the migration adds the column and DB-level quota check.
+    if (error && /file_size.*column|column.*file_size/i.test(error.message)) {
+      const retry = await supabase.from("messages").insert({ room_id: roomId, user_id: userId, body: "", attachment_path: path, attachment_type: "gif" });
+      error = retry.error;
+    }
     if (error) {
       await supabase.storage.from("spirit-files").remove([path]);
       return toast(error.message);

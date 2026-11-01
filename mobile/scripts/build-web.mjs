@@ -33,3 +33,6 @@ for (const density of ["drawable", "drawable-land-hdpi", "drawable-land-mdpi", "
 const htmlPath = resolve(webDir, "index.html");
 let html = await readFile(htmlPath, "utf8");
 html = html.replaceAll("/Spirit/", "./").replace(/<link rel="manifest"[^>]*>\s*/, "");
+
+await writeFile(htmlPath, html, "utf8");
+console.log("Prepared the SpiritHUB /hub/ page for Android.");

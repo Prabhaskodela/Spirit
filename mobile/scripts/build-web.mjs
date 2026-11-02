@@ -14,6 +14,7 @@ for (const name of ["index.html", "app.js", "app.css", "premium.css", "ai.js", "
 }
 await cp(resolve(mobileDir, "mobile-native.css"), resolve(webDir, "mobile-native.css"));
 await cp(resolve(repoDir, "assets"), resolve(webDir, "assets"), { recursive: true });
+await cp(resolve(repoDir, "vendor"), resolve(webDir, "vendor"), { recursive: true });
 
 const androidRes = resolve(mobileDir, "android/app/src/main/res");
 for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {

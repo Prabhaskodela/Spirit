@@ -1,5 +1,5 @@
 // SpiritHUB Workspaces service worker.
-const CACHE_NAME = "spirithub-shell-v8";
+const CACHE_NAME = "spirithub-shell-v9";
 const APP_SHELL = new URL("./", self.location.href).href;
 
 self.addEventListener("install", (event) => {

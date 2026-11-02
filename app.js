@@ -405,6 +405,7 @@ function showAuth() {
   if (state.notifications) supabase.removeChannel(state.notifications);
   state.notifications = null;
   Object.assign(state, { profile: null, workspaces: [] });
+  $("startup-state").hidden = true;
   $("app").hidden = true;
   $("auth").hidden = false;
   $("auth-password").value = "";
@@ -412,6 +413,7 @@ function showAuth() {
 }
 
 function showApp() {
+  $("startup-state").hidden = true;
   $("auth").hidden = true;
   $("app").hidden = false;
   $("me-name").textContent = state.profile.display_name;
@@ -3521,6 +3523,7 @@ window.addEventListener("hashchange", async () => {
 });
 
 if (!configured) {
+  $("startup-state").hidden = true;
   $("setup").hidden = false;
   if (!createClient) {
     $("setup").querySelector("h1").textContent = "Workspace services could not load";

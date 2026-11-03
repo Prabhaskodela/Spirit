@@ -3,6 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { AI_DEFAULTS, aiSettings, askLocalAi, checkAi, markdown, readForAi, summarizeFile, textBudget } from "./ai.js";
 import * as backup from "./backup.js";
+import { createPet } from "./pet.js?v=20261103-ask-ai-pets-1";
 import { SPIRIT_AI_MAX_FILE_BYTES, spiritAiMimeType, askSpiritAi as requestSpiritAi } from "./spirit-ai.js?v=20261101-spirit-ai-9";
 
 const BUCKET = "hub-files";
@@ -2612,6 +2613,7 @@ async function checkBirthdays() {
 const ASK_SYSTEM = "You are SpiritHUB's study assistant for Kalvium students, running on the student's own laptop. Answer directly and concisely in Markdown, with no title or preamble. Use the channel's files when they are relevant. You also help with coding: explain code, find bugs, and give small, correct fixes.";
 const MAX_PICKED = 2; // a small model can only read so much at once
 const aiKey = (channelId) => `spirithub-hub:ai-chat:${state.user.id}:${channelId}`;
+let aiPet = null; // the Menagerie animal on the Ask AI stage (pet.js), made once and kept across renders
 
 // Each channel keeps its own private conversation, saved in this browser only.
 function threadFor(channelId) {
@@ -2640,9 +2642,10 @@ function fileChip(file) {
 function renderAiView() {
   const channel = state.channel;
   if (!channel) return;
+  aiPet ||= createPet();
   const caps = state.ai.caps;
   const readable = state.files.filter((file) => !file.archived_at);
-  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about ${channelDisplayName(channel.name)}, or anything else…`, "aria-label": "Your question" });
+  const input = el("input", { id: "ai-input", autocomplete: "off", maxlength: 4000, placeholder: `Ask about ${channelDisplayName(channel.name)}, or anything else…`, "aria-label": "Your question", oninput: () => aiPet.wake() });
   const form = el("form", { class: "composer", onsubmit: (event) => {
     event.preventDefault();
     const question = input.value.trim();
@@ -2661,9 +2664,11 @@ function renderAiView() {
     readable.length
       ? el("div", { class: "file-chips" }, el("span", { class: "muted small", text: "Read in full:" }), ...readable.map(fileChip))
       : el("p", { class: "file-chips muted small", text: state.files.length ? "This channel's files are archived. The AI still uses their saved summaries." : "No files in this channel yet. You can still ask anything." }),
+    aiPet.node,
     el("div", { class: "ai-thread", id: "ai-thread" }),
     form);
   renderAiThread();
+  if (!state.aiBusy) aiPet.wake();
 }
 
 function renderAiThread() {
@@ -2725,6 +2730,7 @@ async function askAi(question) {
   thread.push({ role: "user", text: question }, answer);
   state.aiBusy = true;
   renderAiThread();
+  aiPet?.setMood("thinking");
   let frame = 0;
   try {
     const messages = await aiMessages(channel, question, history);
@@ -2732,6 +2738,7 @@ async function askAi(question) {
       settings: state.ai.settings,
       caps: state.ai.caps,
       onText: (text) => {
+        if (!answer.text) aiPet?.setMood("typing");
         answer.text = text;
         if (!frame) frame = requestAnimationFrame(() => {
           frame = 0;
@@ -2744,6 +2751,7 @@ async function askAi(question) {
   }
   answer.pending = false;
   state.aiBusy = false;
+  aiPet?.setMood(answer.failed ? "failed" : "done");
   local.set(aiKey(channel.id), thread.slice(-40));
   if (state.channel?.id === channel.id && state.tab === "ai") renderAiThread();
 }

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,11 +10,13 @@ const webDir = resolve(mobileDir, "www");
 
 await rm(webDir, { recursive: true, force: true });
 await mkdir(webDir, { recursive: true });
-for (const name of ["index.html", "app.js", "app.css", "premium.css", "ai.js", "backup.js", "spirit-ai.js", "config.js"]) {
+for (const name of ["index.html", "app.js", "app.css", "premium.css", "ai.js", "backup.js", "spirit-ai.js", "config.js", "pet.js"]) {
   await cp(resolve(repoDir, name), resolve(webDir, name));
 }
 await cp(resolve(mobileDir, "mobile-native.css"), resolve(webDir, "mobile-native.css"));
-await cp(resolve(repoDir, "assets"), resolve(webDir, "assets"), { recursive: true });
+for (const folder of ["assets", "pets", "vendor"]) {
+  await cp(resolve(repoDir, folder), resolve(webDir, folder), { recursive: true });
+}
 
 const androidRes = resolve(mobileDir, "android/app/src/main/res");
 for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
@@ -48,5 +51,19 @@ await build({
   platform: "browser",
   target: "es2020",
 });
+
+// The app only starts when everything it loads is in the package, so stop here if something was left out.
+const missing = new Set();
+const isLocal = (path) => !/^(?:[a-z]+:|\/\/|#)/i.test(path);
+for (const [, path] of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
+  if (isLocal(path) && !existsSync(resolve(webDir, path.split(/[?#]/)[0]))) missing.add(path);
+}
+for (const name of ["app.js", "ai.js", "backup.js", "spirit-ai.js", "pet.js"]) {
+  const code = await readFile(resolve(webDir, name), "utf8");
+  for (const [, path] of code.matchAll(/(?:\bfrom|\bimport\()\s*["'](\.\.?\/[^"']+)["']/g)) {
+    if (!existsSync(resolve(webDir, path.split(/[?#]/)[0]))) missing.add(path);
+  }
+}
+if (missing.size) throw new Error("The Android package is missing files the app loads: " + [...missing].join(", "));
 
 console.log("Prepared Spirited Workspace at the repository root for Android.");

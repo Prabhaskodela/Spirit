@@ -1,0 +1,7 @@
+function showSetupNote() {
+  const note = $("#setup-note");
+  note.hidden = false;
+  note.textContent = "Spirited Workspace screens are ready. Connect a Supabase project in app-config.js and apply schema.sql to enable Google sign-in and shared rooms.";
+  $("#google-sign-in").disabled = true;
+  $("#google-sign-in").setAttribute("aria-describedby", "setup-note");
+}

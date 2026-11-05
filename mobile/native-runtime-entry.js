@@ -9,7 +9,9 @@ import { GOOGLE_WEB_CLIENT_ID } from "./native-google-auth-config.js";
 
 const googleAuthReady = GOOGLE_WEB_CLIENT_ID
   ? SocialLogin.initialize({ google: { webClientId: GOOGLE_WEB_CLIENT_ID, mode: "online" } })
-  : Promise.resolve();
+      .then(() => null)
+      .catch((error) => error)
+  : Promise.resolve(null);
 
 globalThis.SpiritHUBNative = {
   Capacitor, App, Browser, SocialLogin, googleAuthReady, GOOGLE_WEB_CLIENT_ID,

@@ -252,6 +252,9 @@ function authMessage(message, ok = false) {
 function friendlyAuthError(error) {
   const message = error?.message || String(error);
   if (/invalid login credentials/i.test(message)) return "Wrong email or password.";
+  if (/28444|developer console is not set up correctly|unacceptable audience|invalid provider token/i.test(message)) {
+    return "Google sign-in is not configured for this Android build yet. The app package and signing certificate must be registered in Google Cloud.";
+  }
   if (/already (been )?registered/i.test(message)) return "That email already has an account. Sign in instead.";
   if (/email not confirmed/i.test(message)) return "This account isn't confirmed yet. Check your email, or ask your admin to turn off email confirmation in Supabase.";
   if (/signups? (are )?(not allowed|disabled)/i.test(message)) return "New accounts are turned off for this Spirited Workspace.";
@@ -294,7 +297,8 @@ $("google-sign-in").addEventListener("click", async () => {
       if (!native.GOOGLE_WEB_CLIENT_ID) {
         throw new Error("In-app Google sign-in is not configured for this APK yet.");
       }
-      await native.googleAuthReady;
+      const initializationError = await native.googleAuthReady;
+      if (initializationError) throw initializationError;
       const response = await native.SocialLogin.login({
         provider: "google",
         options: { scopes: ["email", "profile"] },
@@ -3556,7 +3560,7 @@ if (isNativeAndroid) {
   const interactiveSwipeTarget = (target) => target instanceof Element && target.closest(
     "button,a,input,textarea,select,[contenteditable='true'],.message-actions,.message-menu,.emoji-picker,.sticker-picker",
   );
-  $("main").addEventListener("pointerdown", (event) => {
+  document.querySelector(".main")?.addEventListener("pointerdown", (event) => {
     if (event.pointerType !== "touch" || !event.isPrimary || interactiveSwipeTarget(event.target)) return;
     const surface = event.target instanceof Element ? event.target.closest("#chat-view, #files-view") : null;
     if (!surface || surface.hidden || state.view !== "channel" || !state.channel || !["chat", "files"].includes(state.tab)) return;

@@ -290,17 +290,26 @@ $("google-sign-in").addEventListener("click", async () => {
   authMessage("");
   try {
     const native = isNativeAndroid ? await nativeRuntimePromise : null;
+    if (native) {
+      if (!native.GOOGLE_WEB_CLIENT_ID) {
+        throw new Error("In-app Google sign-in is not configured for this APK yet.");
+      }
+      await native.googleAuthReady;
+      const response = await native.SocialLogin.login({
+        provider: "google",
+        options: { scopes: ["email", "profile"] },
+      });
+      const idToken = response?.result?.idToken;
+      if (!idToken) throw new Error("Google did not return a sign-in token. Please try again.");
+      const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken });
+      if (error) throw error;
+      return;
+    }
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: isNativeAndroid
-        ? { redirectTo: NATIVE_AUTH_REDIRECT, skipBrowserRedirect: true }
-        : { redirectTo: `${location.origin}${location.pathname}${location.search}` },
+      options: { redirectTo: `${location.origin}${location.pathname}${location.search}` },
     });
     if (error) throw error;
-    if (isNativeAndroid) {
-      if (!data?.url) throw new Error("Google sign-in could not start. Please try again.");
-      await native.Browser.open({ url: data.url });
-    }
   } catch (error) {
     authMessage(friendlyAuthError(error));
     button.disabled = false;
@@ -3542,6 +3551,29 @@ $("members-toggle").addEventListener("click", () => {
 });
 $("scrim").addEventListener("click", closePanels);
 document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => state.channel && setTab(tab.dataset.tab)));
+if (isNativeAndroid) {
+  let swipeStart = null;
+  const interactiveSwipeTarget = (target) => target instanceof Element && target.closest(
+    "button,a,input,textarea,select,[contenteditable='true'],.message-actions,.message-menu,.emoji-picker,.sticker-picker",
+  );
+  $("main").addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch" || !event.isPrimary || interactiveSwipeTarget(event.target)) return;
+    const surface = event.target instanceof Element ? event.target.closest("#chat-view, #files-view") : null;
+    if (!surface || surface.hidden || state.view !== "channel" || !state.channel || !["chat", "files"].includes(state.tab)) return;
+    swipeStart = { x: event.clientX, y: event.clientY, id: event.pointerId, tab: state.tab };
+  }, { passive: true });
+  window.addEventListener("pointerup", (event) => {
+    if (!swipeStart || event.pointerId !== swipeStart.id) return;
+    const { x, y, tab } = swipeStart;
+    swipeStart = null;
+    const dx = event.clientX - x;
+    const dy = event.clientY - y;
+    if (Math.abs(dx) < 72 || Math.abs(dy) > 110 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    if (tab === "chat" && dx < 0) setTab("files");
+    else if (tab === "files" && dx > 0) setTab("chat");
+  }, { passive: true });
+  window.addEventListener("pointercancel", () => { swipeStart = null; }, { passive: true });
+}
 
 $("file-input").addEventListener("change", (event) => {
   uploadFiles([...event.target.files]);

@@ -1072,13 +1072,11 @@ function messageNode(message, grouped, reactions) {
   const actionItems = [
     el("button", { class: "text", type: "button", title: "Reply", onclick: runMessageAction(() => setReply(message)) }, "Reply"),
     ...QUICK_REACTIONS.map((emoji) => el("button", { type: "button", title: `React with ${emoji}`, "aria-label": `React with ${emoji}`, onclick: runMessageAction(() => toggleReaction(message, emoji)) }, emoji)),
+    el("button", { class: "text", type: "button", title: "Delete for me", onclick: runMessageAction(() => hideMessageForMe(message)) }, "Delete for me"),
     message.user_id === state.user.id
-      ? [
-          el("button", { class: "text", type: "button", title: "Delete for me", onclick: runMessageAction(() => hideMessageForMe(message)) }, "Delete for me"),
-          el("button", { class: "text danger-text", type: "button", title: "Unsend for everyone", onclick: runMessageAction(() => deleteMessage(message, file, true)) }, "Unsend"),
-        ]
+      ? el("button", { class: "text danger-text", type: "button", title: "Unsend for everyone", onclick: runMessageAction(() => deleteMessage(message, file, true)) }, "Unsend")
       : state.role === "admin"
-        ? el("button", { class: "text danger-text", type: "button", title: "Delete for everyone", onclick: runMessageAction(() => deleteMessage(message, file, true)) }, "Delete")
+        ? el("button", { class: "text danger-text", type: "button", title: "Delete for everyone", onclick: runMessageAction(() => deleteMessage(message, file, false)) }, "Delete for everyone")
         : null,
   ];
   const actionsPanel = el("div", { class: "msg-actions", role: "group", "aria-label": "Message actions" }, ...actionItems);
@@ -3368,6 +3366,59 @@ async function summarize(file) {
 
 /* ---------- Wiring ---------- */
 
+function handleBackNavigation() {
+  const dialog = document.querySelector("dialog[open]");
+  if (dialog) {
+    dialog.close();
+    return true;
+  }
+  const openMessageMenu = document.querySelector(".msg-menu[open]");
+  if (openMessageMenu) {
+    openMessageMenu.open = false;
+    return true;
+  }
+  if (!$("ws-menu").hidden) {
+    toggleMenu(false);
+    return true;
+  }
+  if (!$("account-settings").hidden) {
+    $("account-settings").hidden = true;
+    $("account-settings-toggle").setAttribute("aria-expanded", "false");
+    return true;
+  }
+  const pickerOpen = !$("emoji-picker").hidden || !$("sticker-picker").hidden;
+  const mentionOpen = mention.items.length > 0;
+  if (pickerOpen || mentionOpen) {
+    togglePicker(null);
+    closeMentionPicker();
+    return true;
+  }
+  if ($("app").classList.contains("nav-open") || $("app").classList.contains("members-open")) {
+    closePanels();
+    return true;
+  }
+  if (state.replyTo) {
+    clearReply();
+    return true;
+  }
+  if (state.view === "admin" || state.view === "memories" || state.view === "spirit-ai") {
+    const last = local.get(LAST_KEY) || {};
+    const channel = state.channels.find((candidate) => candidate.id === last.channels?.[state.workspace?.id]) || orderedChannels()[0];
+    if (channel) void openChannel(channel.id);
+    else showEmpty("channel");
+    return true;
+  }
+  if (state.tab !== "chat") {
+    setTab("chat");
+    return true;
+  }
+  if (state.channel) {
+    showEmpty("channel");
+    return true;
+  }
+  return false;
+}
+
 function closePanels() {
   $("app").classList.remove("nav-open", "members-open");
   $("menu-toggle").setAttribute("aria-expanded", "false");
@@ -3407,13 +3458,8 @@ document.addEventListener("click", (event) => {
   }
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
-  toggleMenu(false);
-  $("account-settings").hidden = true;
-  $("account-settings-toggle").setAttribute("aria-expanded", "false");
-  togglePicker(null);
-  closeMentionPicker();
-  closePanels();
+  if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
+  if (handleBackNavigation()) event.preventDefault();
 });
 
 $("new-workspace").addEventListener("click", createWorkspace);
@@ -3570,6 +3616,9 @@ if (!configured) {
   });
   if (isNativeAndroid) {
     void nativeRuntimePromise.then(async ({ App }) => {
+      await App.addListener("backButton", () => {
+        if (!handleBackNavigation()) void App.exitApp();
+      });
       await App.addListener("appUrlOpen", ({ url }) => {
         void completeNativeOAuth(url).catch((error) => {
           authMessage(friendlyAuthError(error));

@@ -3386,8 +3386,13 @@ function handleBackNavigation() {
     $("account-settings-toggle").setAttribute("aria-expanded", "false");
     return true;
   }
-  togglePicker(null);
-  closeMentionPicker();
+  const pickerOpen = !$("emoji-picker").hidden || !$("sticker-picker").hidden;
+  const mentionOpen = mention.items.length > 0;
+  if (pickerOpen || mentionOpen) {
+    togglePicker(null);
+    closeMentionPicker();
+    return true;
+  }
   if ($("app").classList.contains("nav-open") || $("app").classList.contains("members-open")) {
     closePanels();
     return true;

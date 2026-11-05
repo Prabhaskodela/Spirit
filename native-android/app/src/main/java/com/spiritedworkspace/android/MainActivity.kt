@@ -824,7 +824,8 @@ private fun PdfPageImage(provider: PdfPageProvider, index: Int, width: Int) {
     else Image(
         bitmap = pageBitmap!!.asImageBitmap(), contentDescription = "Page ${index + 1}",
         contentScale = ContentScale.FillWidth,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).graphicsLayer { scaleX = scale; scaleY = scale; translationX = offsetX; translationY = offsetY }.transformable(transform),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).graphicsLayer { scaleX = scale; scaleY = scale; translationX = offsetX; translationY = offsetY }
+            .transformable(transform, canPan = { scale > 1f }),
     )
 }
 

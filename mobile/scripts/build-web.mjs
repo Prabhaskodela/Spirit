@@ -22,11 +22,13 @@ const androidRes = resolve(mobileDir, "android/app/src/main/res");
 for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
   const mipmapDir = resolve(androidRes, "mipmap-" + density);
   await mkdir(mipmapDir, { recursive: true });
-  const launcherIcon = resolve(mobileDir, "assets/spirited-launcher.jpg");
   for (const name of ["ic_launcher", "ic_launcher_round", "ic_launcher_foreground"]) {
+    await rm(resolve(mipmapDir, name + ".jpg"), { force: true });
     await rm(resolve(mipmapDir, name + ".png"), { force: true });
-    await cp(launcherIcon, resolve(mipmapDir, name + ".jpg"));
   }
+  await cp(resolve(mobileDir, "assets/launcher-rounded.png"), resolve(mipmapDir, "ic_launcher.png"));
+  await cp(resolve(mobileDir, "assets/launcher-circle.png"), resolve(mipmapDir, "ic_launcher_round.png"));
+  await cp(resolve(mobileDir, "assets/launcher-foreground.png"), resolve(mipmapDir, "ic_launcher_foreground.png"));
 }
 for (const density of ["drawable", "drawable-land-hdpi", "drawable-land-mdpi", "drawable-land-xhdpi", "drawable-land-xxhdpi", "drawable-land-xxxhdpi", "drawable-port-hdpi", "drawable-port-mdpi", "drawable-port-xhdpi", "drawable-port-xxhdpi", "drawable-port-xxxhdpi"]) {
   const drawableDir = resolve(androidRes, density);

@@ -1,6 +1,6 @@
 # Spirited Workspace Android app
 
-This is an installable Android application built with Capacitor. It packages Spirited Workspace inside an Android WebView and adds Android app links, system-browser Google sign-in, and native PDF handoff. App screens launch from the Android app drawer and do not depend on a Chrome home-screen shortcut.
+This is an installable Android application built with Capacitor. It packages Spirited Workspace inside an Android WebView and adds Android app links, native Google Credential Manager sign-in, and native PDF handoff. App screens launch from the Android app drawer and do not depend on a Chrome home-screen shortcut.
 
 ## Build a debug APK
 
@@ -17,7 +17,11 @@ The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. It ca
 
 ## Google sign-in setup
 
-The Android app uses the system browser and PKCE, then returns to `spirithub://auth/callback`. Add that exact URI to Supabase Authentication's redirect URL allow-list. Google continues to redirect to Supabase's existing callback URL, so no Google OAuth client secret is placed in the Android app and no Google Cloud authorized redirect URI changes are needed.
+Native Google sign-in uses Android Credential Manager and sends the returned ID token to Supabase Auth. Set `GOOGLE_WEB_CLIENT_ID` in `mobile/native-google-auth-config.js` to the Web application OAuth client ID (`...apps.googleusercontent.com`). The same Web client ID must be enabled in the Supabase Google provider settings. The Web client ID is public app configuration; never put its client secret in the app.
+
+In Google Cloud Console, create an Android OAuth client in the same project using package name `com.prabhaskodela.spirithub` and the SHA-1 certificate fingerprint for the APK users install. The debug APK's fingerprint can be read with `keytool -printcert -jarfile app-debug.apk`. For a Play Store app, also register its Play App Signing certificate. The Google consent screen must allow the account being used (add it as a test user while the app is in Testing).
+
+The browser based Google OAuth flow remains in place on the website. Android uses Credential Manager directly and does not open the browser.
 
 ## Build notes
 

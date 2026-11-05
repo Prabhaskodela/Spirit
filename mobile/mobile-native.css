@@ -4,6 +4,7 @@ html,body{width:100%;height:100%;min-height:100%;overscroll-behavior:none}
 body{overflow:hidden}
 .app{height:100%;min-height:0}
 .main,.chat{min-height:0}
+#chat-view,#files-view{touch-action:pan-y}
 
 @media(max-width:420px){
   .channel-header .channel-title .hash{width:32px;height:32px;flex-basis:32px}

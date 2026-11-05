@@ -232,6 +232,16 @@ function setAuthMode(mode) {
   authMessage("");
 }
 
+const authPasswordToggle = $("auth-password-toggle");
+authPasswordToggle.addEventListener("click", () => {
+  const password = $("auth-password");
+  const isVisible = password.type === "text";
+  password.type = isVisible ? "password" : "text";
+  authPasswordToggle.textContent = isVisible ? "Show" : "Hide";
+  authPasswordToggle.setAttribute("aria-label", isVisible ? "Show password" : "Hide password");
+  authPasswordToggle.setAttribute("aria-pressed", String(!isVisible));
+});
+
 function authMessage(message, ok = false) {
   const node = $("auth-error");
   node.hidden = !message;

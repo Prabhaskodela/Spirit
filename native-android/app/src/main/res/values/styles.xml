@@ -1,0 +1,15 @@
+<resources>
+    <style name="Theme.Spirit" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#B9A0FF</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#101116</item>
+        <item name="android:statusBarColor">#101116</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+    <style name="Theme.Spirit.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#101116</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/transparent_splash</item>
+        <item name="postSplashScreenTheme">@style/Theme.Spirit</item>
+    </style>
+</resources>

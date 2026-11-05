@@ -1,0 +1,2 @@
+-keepattributes *Annotation*, InnerClasses, EnclosingMethod
+-keep class kotlinx.serialization.** { *; }

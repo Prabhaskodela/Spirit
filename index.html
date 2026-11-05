@@ -59,10 +59,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Dancing+Script:wght@700&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
-  <link rel="stylesheet" href="app.css?v=20261103-ask-ai-pets-1">
+  <link rel="stylesheet" href="app.css?v=20261105-password-visibility-1">
   <link rel="stylesheet" href="premium.css?v=20261102-logo-nav-cleanup">
   <script src="vendor/supabase-2.117.3.min.js?v=20261102-logo-nav-cleanup"></script>
-  <script type="module" src="app.js?v=20261103-ask-ai-pets-1"></script>
+  <script type="module" src="app.js?v=20261105-password-visibility-1"></script>
   <script>
     // Register at the app root so the installed web app and its cache share one canonical URL.
     if (!navigator.userAgent.includes("SpiritHUBAndroid") && "serviceWorker" in navigator && location.protocol === "https:") {
@@ -99,7 +99,7 @@
       <p class="muted" id="auth-sub">Sign in to your workspaces.</p>
       <label class="field" id="name-field" hidden><span>Display name</span><input class="input" id="auth-name" maxlength="40" autocomplete="nickname" placeholder="What your class calls you"></label>
       <label class="field"><span>Email</span><input class="input" id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
-      <label class="field"><span>Password</span><input class="input" id="auth-password" type="password" required minlength="8" autocomplete="current-password" placeholder="At least 8 characters"></label>
+      <label class="field"><span>Password</span><div class="auth-password-wrap"><input class="input" id="auth-password" type="password" required minlength="8" autocomplete="current-password" placeholder="At least 8 characters"><button class="auth-password-toggle" id="auth-password-toggle" type="button" aria-controls="auth-password" aria-label="Show password" aria-pressed="false">Show</button></div></label>
       <p class="form-error" id="auth-error" role="alert" hidden></p>
       <button class="btn primary wide" id="auth-submit" type="submit">Sign in</button>
       <div class="auth-divider" aria-hidden="true"><span>OR</span></div>

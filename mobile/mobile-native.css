@@ -1,5 +1,7 @@
 /* Android WebView polish: safe sizing is handled by native window insets. */
 *,*::before,*::after{-webkit-tap-highlight-color:transparent}
+/* Google sign-in is unavailable in the Android app; keep it available on the website. */
+.google-auth,.auth-divider{display:none!important}
 html,body{width:100%;height:100%;min-height:100%;overscroll-behavior:none}
 body{overflow:hidden}
 .app{height:100%;min-height:0}
